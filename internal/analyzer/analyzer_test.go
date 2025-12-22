@@ -24,3 +24,18 @@ func TestAllowlistSkipsLine(t *testing.T) {
 		}
 	}
 }
+
+func TestNonStandardExtensionAddsFinding(t *testing.T) {
+	script := []byte("echo ok\n")
+	findings := AnalyzeScript("script.txt", script, config.PolicyConfig{})
+	hasExtensionFinding := false
+	for _, f := range findings {
+		if f.Code == "NON_STANDARD_EXTENSION" {
+			hasExtensionFinding = true
+			break
+		}
+	}
+	if !hasExtensionFinding {
+		t.Fatalf("expected extension finding for non .sh file")
+	}
+}

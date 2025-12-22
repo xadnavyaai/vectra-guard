@@ -139,7 +139,7 @@ func exists(path string) bool {
 func decodeYAML(data []byte) (Config, error) {
 	var cfg Config
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	section := ""
+	mode := ""
 	var listTarget *[]string
 
 	for scanner.Scan() {
@@ -148,51 +148,36 @@ func decodeYAML(data []byte) (Config, error) {
 			continue
 		}
 		if strings.HasSuffix(line, ":") {
-			section = strings.TrimSuffix(line, ":")
-			listTarget = nil
-			continue
-		}
-		if strings.HasPrefix(line, "- ") {
-			if listTarget == nil {
-				continue
-			}
-			*listTarget = append(*listTarget, strings.TrimSpace(strings.TrimPrefix(line, "- ")))
-			continue
-		}
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(parts[0])
-		value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
-
-		switch section {
-		case "logging":
-			if key == "format" {
-				cfg.Logging.Format = value
-			}
-		case "policies":
-			switch key {
+			switch strings.TrimSuffix(line, ":") {
+			case "logging":
+				mode = "logging"
+				listTarget = nil
+			case "policies":
+				mode = "policies"
+				listTarget = nil
 			case "allowlist":
-				listTarget = &cfg.Policies.Allowlist
-				if value != "" {
-					for _, part := range strings.Split(value, ",") {
-						item := strings.TrimSpace(part)
-						if item != "" {
-							cfg.Policies.Allowlist = append(cfg.Policies.Allowlist, item)
-						}
-					}
+				if mode == "policies" {
+					listTarget = &cfg.Policies.Allowlist
 				}
 			case "denylist":
-				listTarget = &cfg.Policies.Denylist
-				if value != "" {
-					for _, part := range strings.Split(value, ",") {
-						item := strings.TrimSpace(part)
-						if item != "" {
-							cfg.Policies.Denylist = append(cfg.Policies.Denylist, item)
-						}
-					}
+				if mode == "policies" {
+					listTarget = &cfg.Policies.Denylist
 				}
+			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "- ") {
+			if listTarget != nil {
+				*listTarget = append(*listTarget, strings.TrimSpace(strings.TrimPrefix(line, "- ")))
+			}
+			continue
+		}
+
+		if mode == "logging" && strings.HasPrefix(line, "format:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				cfg.Logging.Format = strings.Trim(strings.TrimSpace(parts[1]), `"'`)
 			}
 		}
 	}
