@@ -27,9 +27,8 @@ if command -v vectra-guard &> /dev/null; then
             echo "⚡ Non-interactive environment - auto-upgrading..."
             UPGRADE=true
         else
-            # Read from /dev/tty instead of stdin when piped
-            exec < /dev/tty
-            read -p "Upgrade to latest version? [Y/n] " -n 1 -r
+            # Read directly from /dev/tty when piped
+            read -p "Upgrade to latest version? [Y/n] " -n 1 -r < /dev/tty
             echo
             if [[ $REPLY =~ ^[Nn]$ ]]; then
                 echo "❌ Installation cancelled"

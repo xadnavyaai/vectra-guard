@@ -29,11 +29,11 @@ if [ ! -t 0 ]; then
         echo "   Uninstall cancelled (requires interactive terminal)"
         exit 0
     fi
-    # Read from /dev/tty instead of stdin when piped
-    exec < /dev/tty
+    # Read directly from /dev/tty when piped
+    read -p "Remove Vectra Guard? [y/N] " -n 1 -r < /dev/tty
+else
+    read -p "Remove Vectra Guard? [y/N] " -n 1 -r
 fi
-
-read -p "Remove Vectra Guard? [y/N] " -n 1 -r
 echo
 
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
