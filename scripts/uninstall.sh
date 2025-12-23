@@ -21,16 +21,20 @@ echo "Found Vectra Guard at: $(which vectra-guard)"
 echo ""
 
 # Confirm uninstall
-# Use /dev/tty to read from terminal when piped through curl | bash
-if [ -t 0 ]; then
-    read -p "Remove Vectra Guard? [y/N] " -n 1 -r
-    echo
-else
-    # Non-interactive mode - require explicit confirmation
-    echo "⚠️  Running in non-interactive mode"
-    echo "   Uninstall cancelled (use interactive terminal for removal)"
-    exit 0
+# Use /dev/tty to read from terminal even when piped through curl | bash
+if [ ! -t 0 ]; then
+    # Check if we have access to /dev/tty (real terminal)
+    if [ ! -c /dev/tty ]; then
+        echo "⚠️  Running in non-interactive environment"
+        echo "   Uninstall cancelled (requires interactive terminal)"
+        exit 0
+    fi
+    # Read from /dev/tty instead of stdin when piped
+    exec < /dev/tty
 fi
+
+read -p "Remove Vectra Guard? [y/N] " -n 1 -r
+echo
 
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "❌ Uninstall cancelled"

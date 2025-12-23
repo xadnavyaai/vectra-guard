@@ -20,10 +20,23 @@ if command -v vectra-guard &> /dev/null; then
     echo "   Version: $INSTALLED_VERSION"
     echo ""
     
-    # Non-interactive mode - force upgrade
+    # Prompt for upgrade (use /dev/tty if piped through curl | bash)
     if [ ! -t 0 ]; then
-        echo "⚡ Running in non-interactive mode - upgrading..."
-        UPGRADE=true
+        # Check if we have access to /dev/tty (real terminal)
+        if [ ! -c /dev/tty ]; then
+            echo "⚡ Non-interactive environment - auto-upgrading..."
+            UPGRADE=true
+        else
+            # Read from /dev/tty instead of stdin when piped
+            exec < /dev/tty
+            read -p "Upgrade to latest version? [Y/n] " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Nn]$ ]]; then
+                echo "❌ Installation cancelled"
+                exit 0
+            fi
+            UPGRADE=true
+        fi
     else
         read -p "Upgrade to latest version? [Y/n] " -n 1 -r
         echo
