@@ -59,7 +59,12 @@ type Manager struct {
 
 // NewManager creates a new session manager.
 func NewManager(workspace string, logger *logging.Logger) (*Manager, error) {
-	sessionDir := filepath.Join(workspace, ".vectra-guard", "sessions")
+	// Always use home directory for global session storage
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("get home directory: %w", err)
+	}
+	sessionDir := filepath.Join(homeDir, ".vectra-guard", "sessions")
 	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create session directory: %w", err)
 	}
