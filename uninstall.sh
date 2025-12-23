@@ -18,8 +18,6 @@ if ! command -v vectra-guard &> /dev/null; then
 fi
 
 echo "Found Vectra Guard at: $(which vectra-guard)"
-CURRENT_VERSION=$(vectra-guard --help 2>&1 | head -1 || echo "unknown")
-echo "Version: $CURRENT_VERSION"
 echo ""
 
 # Confirm uninstall
