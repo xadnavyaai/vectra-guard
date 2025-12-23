@@ -256,8 +256,15 @@ echo ""
 
 # Optional: Install command aliases
 echo "Step 4/4: Setting up safety aliases (optional)..."
-read -p "Install safety aliases (wrap dangerous commands)? [y/N] " -n 1 -r
-echo
+# Use /dev/tty to read from terminal when piped through curl | bash
+if [ -t 0 ]; then
+    read -p "Install safety aliases (wrap dangerous commands)? [y/N] " -n 1 -r < /dev/tty
+    echo
+else
+    # Non-interactive mode - skip aliases
+    REPLY="n"
+    echo "  ℹ️  Skipping in non-interactive mode"
+fi
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     for shell in "${SHELLS[@]}"; do
         case $shell in
