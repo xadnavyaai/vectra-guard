@@ -108,6 +108,9 @@ if command -v vectra-guard &> /dev/null; then
     
     # Initialize on shell start
     _vectra_guard_init
+    
+    # Convenience alias
+    alias vg='vectra-guard'
 fi
 
 # End Vectra Guard Integration
@@ -171,6 +174,9 @@ if command -v vectra-guard &> /dev/null; then
     
     # Initialize
     _vectra_guard_init
+    
+    # Convenience alias
+    alias vg='vectra-guard'
 fi
 
 # End Vectra Guard Integration
@@ -225,6 +231,9 @@ if command -v vectra-guard > /dev/null
     
     # Initialize
     _vectra_guard_init
+    
+    # Convenience alias
+    alias vg='vectra-guard'
 end
 
 # End Vectra Guard Integration
