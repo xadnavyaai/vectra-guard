@@ -60,6 +60,29 @@ go build -o vectra-guard main.go
 sudo cp vectra-guard /usr/local/bin/
 ```
 
+### Upgrade to Latest Version
+
+```bash
+# Automatic upgrade
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+
+# Or use the update script
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/update.sh | bash
+```
+
+The installer detects existing installations and offers to upgrade automatically.
+
+### Uninstall
+
+```bash
+# Interactive uninstall (removes binary, shell integration, optionally data)
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/uninstall.sh | bash
+
+# Manual uninstall
+sudo rm /usr/local/bin/vectra-guard
+rm -rf ~/.vectra-guard  # Optional: removes all data
+```
+
 ### After Installation
 
 **Option 1: Universal Protection (Recommended)**

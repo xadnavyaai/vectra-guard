@@ -12,6 +12,30 @@ echo "🛡️  Vectra Guard Installer"
 echo "=========================="
 echo ""
 
+# Check if already installed
+if command -v vectra-guard &> /dev/null; then
+    INSTALLED_VERSION=$(vectra-guard --help 2>&1 | head -1 || echo "unknown")
+    echo "ℹ️  Vectra Guard is already installed"
+    echo "   Location: $(which vectra-guard)"
+    echo "   Version: $INSTALLED_VERSION"
+    echo ""
+    
+    # Non-interactive mode - force upgrade
+    if [ ! -t 0 ]; then
+        echo "⚡ Running in non-interactive mode - upgrading..."
+        UPGRADE=true
+    else
+        read -p "Upgrade to latest version? [Y/n] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            echo "❌ Installation cancelled"
+            exit 0
+        fi
+        UPGRADE=true
+    fi
+    echo ""
+fi
+
 # Detect OS and architecture
 OS="$(uname -s)"
 ARCH="$(uname -m)"
@@ -89,9 +113,19 @@ fi
 
 # Verify
 if command -v vectra-guard &> /dev/null; then
-    VERSION=$(vectra-guard --help 2>&1 | head -1 || echo "installed")
+    NEW_VERSION=$(vectra-guard --help 2>&1 | head -1 || echo "installed")
     echo ""
-    echo "✅ Vectra Guard installed successfully!"
+    
+    if [ "${UPGRADE}" = true ]; then
+        echo "✅ Vectra Guard upgraded successfully!"
+        echo ""
+        echo "   Old: $INSTALLED_VERSION"
+        echo "   New: $NEW_VERSION"
+    else
+        echo "✅ Vectra Guard installed successfully!"
+        echo "   Version: $NEW_VERSION"
+    fi
+    
     echo ""
     echo "🚀 Get started:"
     echo ""
@@ -105,6 +139,7 @@ if command -v vectra-guard &> /dev/null; then
     echo "      vectra-guard validate your-script.sh"
     echo ""
     echo "📚 Documentation: https://github.com/${REPO}"
+    echo "🗑️  Uninstall: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/uninstall.sh | bash"
     echo ""
 else
     echo ""
