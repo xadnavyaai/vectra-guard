@@ -66,7 +66,7 @@ if command -v vectra-guard &> /dev/null; then
     _vectra_guard_init() {
         if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
             if [ -f ~/.vectra-guard-session ]; then
-                export VECTRAGUARD_SESSION_ID=$(cat ~/.vectra-guard-session)
+                export VECTRAGUARD_SESSION_ID=$(tail -1 ~/.vectra-guard-session)
                 # Verify session is still valid
                 if ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
                     # Session expired, start new one
@@ -75,7 +75,7 @@ if command -v vectra-guard &> /dev/null; then
             fi
             
             if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
-                SESSION=$(vectra-guard session start --agent "${USER}-bash" --workspace "$HOME" 2>/dev/null)
+                SESSION=$(vectra-guard session start --agent "${USER}-bash" --workspace "$HOME" 2>/dev/null | tail -1)
                 if [ -n "$SESSION" ]; then
                     export VECTRAGUARD_SESSION_ID=$SESSION
                     echo $SESSION > ~/.vectra-guard-session
@@ -130,7 +130,7 @@ if command -v vectra-guard &> /dev/null; then
     _vectra_guard_init() {
         if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
             if [[ -f ~/.vectra-guard-session ]]; then
-                export VECTRAGUARD_SESSION_ID=$(cat ~/.vectra-guard-session)
+                export VECTRAGUARD_SESSION_ID=$(tail -1 ~/.vectra-guard-session)
                 # Verify session is still valid
                 if ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
                     unset VECTRAGUARD_SESSION_ID
@@ -138,7 +138,7 @@ if command -v vectra-guard &> /dev/null; then
             fi
             
             if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
-                SESSION=$(vectra-guard session start --agent "${USER}-zsh" --workspace "$HOME" 2>/dev/null)
+                SESSION=$(vectra-guard session start --agent "${USER}-zsh" --workspace "$HOME" 2>/dev/null | tail -1)
                 if [[ -n "$SESSION" ]]; then
                     export VECTRAGUARD_SESSION_ID=$SESSION
                     echo $SESSION > ~/.vectra-guard-session
@@ -194,7 +194,7 @@ if command -v vectra-guard > /dev/null
     function _vectra_guard_init
         if not set -q VECTRAGUARD_SESSION_ID
             if test -f ~/.vectra-guard-session
-                set -gx VECTRAGUARD_SESSION_ID (cat ~/.vectra-guard-session)
+                set -gx VECTRAGUARD_SESSION_ID (tail -1 ~/.vectra-guard-session)
                 # Verify session
                 if not vectra-guard session show $VECTRAGUARD_SESSION_ID &> /dev/null
                     set -e VECTRAGUARD_SESSION_ID
@@ -202,7 +202,7 @@ if command -v vectra-guard > /dev/null
             end
             
             if not set -q VECTRAGUARD_SESSION_ID
-                set -gx VECTRAGUARD_SESSION_ID (vectra-guard session start --agent "$USER-fish" --workspace $HOME 2>/dev/null)
+                set -gx VECTRAGUARD_SESSION_ID (vectra-guard session start --agent "$USER-fish" --workspace $HOME 2>/dev/null | tail -1)
                 if test -n "$VECTRAGUARD_SESSION_ID"
                     echo $VECTRAGUARD_SESSION_ID > ~/.vectra-guard-session
                     echo "🛡️  Vectra Guard session: $VECTRAGUARD_SESSION_ID"
