@@ -55,6 +55,12 @@ func encodeTOML(cfg config.Config) (string, error) {
 	builder.WriteString("[policies]\n")
 	builder.WriteString(formatArray("allowlist", cfg.Policies.Allowlist))
 	builder.WriteString(formatArray("denylist", cfg.Policies.Denylist))
+	builder.WriteString("\n[env_protection]\n")
+	builder.WriteString(fmt.Sprintf("enabled = %t\n", cfg.EnvProtection.Enabled))
+	builder.WriteString(fmt.Sprintf("masking_mode = \"%s\"  # Options: full, partial, hash, fake\n", cfg.EnvProtection.MaskingMode))
+	builder.WriteString(fmt.Sprintf("block_env_access = %t  # Block printenv, env commands\n", cfg.EnvProtection.BlockEnvAccess))
+	builder.WriteString(fmt.Sprintf("block_dotenv_read = %t  # Block reading .env files\n", cfg.EnvProtection.BlockDotenvRead))
+	builder.WriteString(formatArray("allow_read_vars", cfg.EnvProtection.AllowReadVars))
 	return builder.String(), nil
 }
 
@@ -69,6 +75,15 @@ func encodeYAML(cfg config.Config) (string, error) {
 	}
 	builder.WriteString("  denylist:\n")
 	for _, item := range cfg.Policies.Denylist {
+		builder.WriteString(fmt.Sprintf("    - %s\n", item))
+	}
+	builder.WriteString("env_protection:\n")
+	builder.WriteString(fmt.Sprintf("  enabled: %t\n", cfg.EnvProtection.Enabled))
+	builder.WriteString(fmt.Sprintf("  masking_mode: %s  # Options: full, partial, hash, fake\n", cfg.EnvProtection.MaskingMode))
+	builder.WriteString(fmt.Sprintf("  block_env_access: %t  # Block printenv, env commands\n", cfg.EnvProtection.BlockEnvAccess))
+	builder.WriteString(fmt.Sprintf("  block_dotenv_read: %t  # Block reading .env files\n", cfg.EnvProtection.BlockDotenvRead))
+	builder.WriteString("  allow_read_vars:\n")
+	for _, item := range cfg.EnvProtection.AllowReadVars {
 		builder.WriteString(fmt.Sprintf("    - %s\n", item))
 	}
 	return builder.String(), nil

@@ -12,8 +12,9 @@ import (
 
 // Config represents the merged configuration for vectra-guard.
 type Config struct {
-	Logging  LoggingConfig `yaml:"logging" toml:"logging" json:"logging"`
-	Policies PolicyConfig  `yaml:"policies" toml:"policies" json:"policies"`
+	Logging       LoggingConfig       `yaml:"logging" toml:"logging" json:"logging"`
+	Policies      PolicyConfig        `yaml:"policies" toml:"policies" json:"policies"`
+	EnvProtection EnvProtectionConfig `yaml:"env_protection" toml:"env_protection" json:"env_protection"`
 }
 
 // LoggingConfig controls output formatting.
@@ -27,6 +28,17 @@ type PolicyConfig struct {
 	Denylist  []string `yaml:"denylist" toml:"denylist" json:"denylist"`
 }
 
+// EnvProtectionConfig controls environment variable protection and masking.
+type EnvProtectionConfig struct {
+	Enabled         bool              `yaml:"enabled" toml:"enabled" json:"enabled"`
+	MaskingMode     string            `yaml:"masking_mode" toml:"masking_mode" json:"masking_mode"` // full, partial, hash, fake
+	ProtectedVars   []string          `yaml:"protected_vars" toml:"protected_vars" json:"protected_vars"`
+	AllowReadVars   []string          `yaml:"allow_read_vars" toml:"allow_read_vars" json:"allow_read_vars"`
+	FakeValues      map[string]string `yaml:"fake_values" toml:"fake_values" json:"fake_values"`
+	BlockEnvAccess  bool              `yaml:"block_env_access" toml:"block_env_access" json:"block_env_access"`
+	BlockDotenvRead bool              `yaml:"block_dotenv_read" toml:"block_dotenv_read" json:"block_dotenv_read"`
+}
+
 // DefaultConfig returns the in-process defaults.
 func DefaultConfig() Config {
 	return Config{
@@ -34,6 +46,15 @@ func DefaultConfig() Config {
 		Policies: PolicyConfig{
 			Allowlist: []string{},
 			Denylist:  []string{"rm -rf /", "sudo ", ":(){ :|:& };:", "mkfs", "dd if="},
+		},
+		EnvProtection: EnvProtectionConfig{
+			Enabled:         true,
+			MaskingMode:     "partial", // partial, full, hash, fake
+			ProtectedVars:   []string{},
+			AllowReadVars:   []string{"HOME", "USER", "PATH", "SHELL", "TERM", "LANG", "PWD"},
+			FakeValues:      make(map[string]string),
+			BlockEnvAccess:  false, // Warn but don't block by default
+			BlockDotenvRead: true,  // Block .env file reads by default
 		},
 	}
 }

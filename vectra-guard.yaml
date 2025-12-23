@@ -1,0 +1,24 @@
+logging:
+  format: text
+policies:
+  allowlist:
+    - echo "safe"
+    - touch /tmp/ok
+  denylist:
+    - rm -rf /
+    - sudo 
+    - mkfs
+    - dd if=
+env_protection:
+  enabled: true
+  masking_mode: partial  # Options: full, partial, hash, fake
+  block_env_access: false  # Block printenv, env commands
+  block_dotenv_read: true  # Block reading .env files
+  allow_read_vars:
+    - HOME
+    - USER
+    - PATH
+    - SHELL
+    - TERM
+    - LANG
+    - PWD

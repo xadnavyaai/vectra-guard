@@ -162,6 +162,56 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				break
 			}
 		}
+
+		// Environment variable access detection
+		envAccessPatterns := []string{
+			"printenv", "env", "export -p", "set |", "declare -p",
+			"cat .env", "cat ~/.env", "source .env",
+		}
+		if containsAnyWord(lower, envAccessPatterns) || strings.Contains(lower, "cat .env") {
+			findings = append(findings, Finding{
+				Severity:       "high",
+				Code:           "ENV_ACCESS",
+				Description:    "Environment variable access detected",
+				Line:           lineNum,
+				Recommendation: "Agent attempting to read environment variables. Consider masking sensitive values or blocking access.",
+			})
+		}
+
+		// Sensitive environment variable patterns
+		sensitiveEnvPatterns := []string{
+			"$password", "$secret", "$key", "$token", "$api_key",
+			"$aws_secret", "$aws_access_key", "$github_token", "$ssh_key",
+			"$db_password", "$database_url", "$private_key", "$auth_token",
+		}
+		for _, pattern := range sensitiveEnvPatterns {
+			if strings.Contains(lower, pattern) || 
+			   strings.Contains(lower, strings.ToUpper(pattern)) ||
+			   strings.Contains(lower, strings.ReplaceAll(pattern, "_", "")) {
+				findings = append(findings, Finding{
+					Severity:       "critical",
+					Code:           "SENSITIVE_ENV_ACCESS",
+					Description:    "Attempt to access sensitive environment variable: " + pattern,
+					Line:           lineNum,
+					Recommendation: "BLOCK or MASK this operation. Agent should not access credentials directly. Use secure secret management.",
+				})
+				break
+			}
+		}
+
+		// .env file operations
+		if (strings.Contains(lower, ".env") || strings.Contains(lower, "dotenv")) &&
+		   (strings.Contains(lower, "cat") || strings.Contains(lower, "less") || 
+		    strings.Contains(lower, "head") || strings.Contains(lower, "tail") ||
+		    strings.Contains(lower, "grep") || strings.Contains(lower, "awk")) {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "DOTENV_FILE_READ",
+				Description:    "Attempt to read .env file containing credentials",
+				Line:           lineNum,
+				Recommendation: "BLOCK this operation. Provide sanitized config instead of exposing raw .env files.",
+			})
+		}
 	}
 
 	// Incorporate file extension heuristics if script extension implies something unexpected.
