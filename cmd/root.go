@@ -80,6 +80,48 @@ func execute(args []string) error {
 			return usageError()
 		}
 		return runExplain(ctx, subFlags.Arg(0))
+	case "exec":
+		subFlags := flag.NewFlagSet("exec", flag.ContinueOnError)
+		interactive := subFlags.Bool("interactive", false, "Prompt for approval on risky commands")
+		sessionID := subFlags.String("session", "", "Track execution in session")
+		if err := subFlags.Parse(subArgs); err != nil {
+			return err
+		}
+		if subFlags.NArg() < 1 {
+			return usageError()
+		}
+		return runExec(ctx, subFlags.Args(), *interactive, *sessionID)
+	case "session":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		sessionCmd := subArgs[0]
+		sessionArgs := subArgs[1:]
+		
+		switch sessionCmd {
+		case "start":
+			subFlags := flag.NewFlagSet("session-start", flag.ContinueOnError)
+			agent := subFlags.String("agent", "unknown", "Agent name")
+			workspace := subFlags.String("workspace", "", "Workspace path")
+			if err := subFlags.Parse(sessionArgs); err != nil {
+				return err
+			}
+			return runSessionStart(ctx, *agent, *workspace)
+		case "end":
+			if len(sessionArgs) < 1 {
+				return usageError()
+			}
+			return runSessionEnd(ctx, sessionArgs[0])
+		case "list":
+			return runSessionList(ctx)
+		case "show":
+			if len(sessionArgs) < 1 {
+				return usageError()
+			}
+			return runSessionShow(ctx, sessionArgs[0])
+		default:
+			return usageError()
+		}
 	default:
 		return usageError()
 	}
@@ -88,5 +130,17 @@ func execute(args []string) error {
 func usageError() error {
 	exe, _ := os.Executable()
 	name := filepath.Base(exe)
-	return fmt.Errorf("usage: %s [--config FILE] [--output text|json] <init|validate|explain> [args]", name)
+	usage := fmt.Sprintf(`usage: %s [--config FILE] [--output text|json] <command> [args]
+
+Commands:
+  init                         Initialize configuration file
+  validate <script>            Validate a shell script for security issues
+  explain <script>             Explain security risks in a script
+  exec [--interactive] <cmd>   Execute command with security validation
+  session start                Start an agent session
+  session end <id>             End an agent session
+  session list                 List all sessions
+  session show <id>            Show session details
+`, name)
+	return fmt.Errorf("%s", usage)
 }

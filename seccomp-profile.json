@@ -1,0 +1,141 @@
+{
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "defaultErrnoRet": 1,
+  "architectures": [
+    "SCMP_ARCH_X86_64",
+    "SCMP_ARCH_X86",
+    "SCMP_ARCH_AARCH64",
+    "SCMP_ARCH_ARM"
+  ],
+  "syscalls": [
+    {
+      "names": [
+        "accept",
+        "accept4",
+        "access",
+        "arch_prctl",
+        "bind",
+        "brk",
+        "chdir",
+        "chmod",
+        "chown",
+        "clone",
+        "close",
+        "connect",
+        "dup",
+        "dup2",
+        "dup3",
+        "epoll_create",
+        "epoll_create1",
+        "epoll_ctl",
+        "epoll_wait",
+        "epoll_pwait",
+        "execve",
+        "exit",
+        "exit_group",
+        "fcntl",
+        "fstat",
+        "futex",
+        "getcwd",
+        "getdents",
+        "getdents64",
+        "getegid",
+        "geteuid",
+        "getgid",
+        "getgroups",
+        "getpid",
+        "getppid",
+        "getrlimit",
+        "gettid",
+        "getuid",
+        "ioctl",
+        "listen",
+        "lseek",
+        "mmap",
+        "mprotect",
+        "munmap",
+        "nanosleep",
+        "open",
+        "openat",
+        "pipe",
+        "pipe2",
+        "poll",
+        "prctl",
+        "pread64",
+        "pwrite64",
+        "read",
+        "readlink",
+        "recvfrom",
+        "recvmsg",
+        "rt_sigaction",
+        "rt_sigprocmask",
+        "rt_sigreturn",
+        "sched_getaffinity",
+        "sched_yield",
+        "select",
+        "sendmsg",
+        "sendto",
+        "set_robust_list",
+        "set_tid_address",
+        "setgid",
+        "setgroups",
+        "setuid",
+        "shutdown",
+        "sigaltstack",
+        "socket",
+        "socketpair",
+        "stat",
+        "tgkill",
+        "uname",
+        "unlink",
+        "wait4",
+        "waitid",
+        "write"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "mount",
+        "umount",
+        "umount2",
+        "pivot_root",
+        "chroot",
+        "unshare",
+        "setns"
+      ],
+      "action": "SCMP_ACT_KILL",
+      "comment": "Block container escape attempts"
+    },
+    {
+      "names": [
+        "ptrace",
+        "process_vm_readv",
+        "process_vm_writev"
+      ],
+      "action": "SCMP_ACT_KILL",
+      "comment": "Block process inspection"
+    },
+    {
+      "names": [
+        "reboot",
+        "swapon",
+        "swapoff",
+        "syslog"
+      ],
+      "action": "SCMP_ACT_KILL",
+      "comment": "Block system-level operations"
+    },
+    {
+      "names": [
+        "ioperm",
+        "iopl",
+        "pciconfig_read",
+        "pciconfig_write"
+      ],
+      "action": "SCMP_ACT_KILL",
+      "comment": "Block hardware access"
+    }
+  ]
+}
+
