@@ -16,32 +16,49 @@ After following this guide:
 
 ## ⚡ Quick Start (30 Seconds)
 
-### Step 1: Get Vectra Guard
+### Step 1: Install Vectra Guard
+
+**Easiest method** - one command:
 
 ```bash
-# Clone the repository
-git clone https://github.com/xadnavyaai/vectra-guard.git
-cd vectra-guard
+# Automatically downloads and installs latest release
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-### Step 2: Build It
+**Or download manually:**
 
 ```bash
-# Build the binary
-go build -o vectra-guard main.go
+# macOS ARM64 (M1/M2/M3)
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-darwin-arm64
+chmod +x vectra-guard-darwin-arm64
+sudo mv vectra-guard-darwin-arm64 /usr/local/bin/vectra-guard
 
-# Install to PATH (optional but recommended)
-sudo cp vectra-guard /usr/local/bin/
+# macOS Intel
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-darwin-amd64
+chmod +x vectra-guard-darwin-amd64
+sudo mv vectra-guard-darwin-amd64 /usr/local/bin/vectra-guard
+
+# Linux (replace with your architecture)
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-linux-amd64
+chmod +x vectra-guard-linux-amd64
+sudo mv vectra-guard-linux-amd64 /usr/local/bin/vectra-guard
 ```
 
-### Step 3: Install Universal Protection
+### Step 2: Install Universal Protection
 
 ```bash
-# This makes it work everywhere
-./scripts/install-universal-shell-protection.sh
+# This makes it work everywhere (Cursor, VSCode, Terminal)
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-universal-shell-protection.sh | bash
 ```
 
-**That's it!** Now restart your terminal.
+### Step 3: Restart Terminal
+
+```bash
+# Close and reopen your terminal (or run):
+exec $SHELL
+```
+
+**That's it!** Vectra Guard is now protecting all your commands.
 
 ---
 

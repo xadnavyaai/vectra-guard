@@ -502,17 +502,55 @@ Planned features:
 
 ---
 
-## 📦 Download
+## 📦 Download & Install
+
+### Method 1: One-Command Install (Recommended)
 
 ```bash
-# Update via install script
+# Automatically downloads and installs latest release
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+```
 
-# Or build from source
+### Method 2: Download Pre-Built Binary
+
+**Visit the releases page:** [v0.0.2 Release](https://github.com/xadnavyaai/vectra-guard/releases/tag/v0.0.2)
+
+Or download directly:
+
+```bash
+# macOS ARM64 (M1/M2/M3)
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/download/v0.0.2/vectra-guard-darwin-arm64
+chmod +x vectra-guard-darwin-arm64
+sudo mv vectra-guard-darwin-arm64 /usr/local/bin/vectra-guard
+
+# macOS Intel
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/download/v0.0.2/vectra-guard-darwin-amd64
+chmod +x vectra-guard-darwin-amd64
+sudo mv vectra-guard-darwin-amd64 /usr/local/bin/vectra-guard
+
+# Linux AMD64
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/download/v0.0.2/vectra-guard-linux-amd64
+chmod +x vectra-guard-linux-amd64
+sudo mv vectra-guard-linux-amd64 /usr/local/bin/vectra-guard
+
+# Linux ARM64
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/download/v0.0.2/vectra-guard-linux-arm64
+chmod +x vectra-guard-linux-arm64
+sudo mv vectra-guard-linux-arm64 /usr/local/bin/vectra-guard
+
+# Windows
+curl -LO https://github.com/xadnavyaai/vectra-guard/releases/download/v0.0.2/vectra-guard-windows-amd64.exe
+# Move to desired location and add to PATH
+```
+
+### Method 3: Build from Source (Developers)
+
+```bash
 git clone https://github.com/xadnavyaai/vectra-guard.git
 cd vectra-guard
 git checkout v0.0.2
 go build -o vectra-guard
+sudo cp vectra-guard /usr/local/bin/
 ```
 
 ---
