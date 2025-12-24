@@ -1,228 +1,115 @@
-# Vectra Guard - Example Configuration
-# This file demonstrates all available configuration options
-# Copy to vectra-guard.yaml in your project root or ~/.config/vectra-guard/
+# Vectra Guard Configuration
+# Simple, clean, rock solid protection
 
-# Logging configuration
-logging:
-  format: json  # Options: json, text
+# ============================================
+# GUARD LEVEL (Auto-Detection Recommended)
+# ============================================
 
-# Guard level controls overall security posture
 guard_level:
-  # Security level: off, low, medium, high, paranoid
-  # - off: No protection
-  # - low: Only critical issues blocked
-  # - medium: Critical + high issues blocked (DEFAULT)
-  # - high: Critical + high + medium issues blocked
-  # - paranoid: Everything requires approval
-  level: medium
+  # Security level: auto (recommended), low, medium, high, paranoid
+  # 
+  # 'auto' intelligently detects context and adjusts protection:
+  #   - Local dev (feature branches) → low protection
+  #   - Staging environments → high protection  
+  #   - Production environments → paranoid (requires approval)
+  #   - Ambiguous context → medium (safe default)
+  #
+  # Detection considers: git branch, URLs, DB names, file paths, command strings
+  # When in doubt, chooses the most protective level (safety first!)
+  level: auto
   
-  # Allow users to bypass protection with environment variable
-  # Set to false in production for maximum security
+  # Override auto-detection: VECTRA_GUARD_LEVEL=low vg exec ...
   allow_user_bypass: true
-  
-  # Environment variable name for bypass
-  # Usage: export VECTRAGUARD_BYPASS="i-am-human-$(whoami)"
   bypass_env_var: VECTRAGUARD_BYPASS
-  
-  # Minimum severity that requires approval
-  # Options: low, medium, high, critical
-  require_approval_above: medium
 
-# Security policies
-policies:
-  # Git Operations Monitoring
-  # Monitor and control risky git operations
-  monitor_git_ops: true
+# ============================================
+# ENVIRONMENT DETECTION
+# ============================================
+
+# Teach Vectra Guard your organization's patterns
+production_indicators:
+  # Git branches that indicate production
+  branches:
+    - main
+    - master
+    - production
+    - release
   
-  # Block force push operations (git push --force / -f)
-  # Set to false in development environments if needed
-  block_force_git: true
-  
-  # Production Environment Detection
-  # Detect and warn about operations targeting production/staging
-  detect_prod_env: true
-  
-  # Patterns to identify production environments
-  # These patterns are checked in URLs, hostnames, paths, etc.
-  prod_env_patterns:
+  # Keywords in URLs, hostnames, database names, paths
+  keywords:
     - prod
     - production
     - prd
     - live
     - staging
     - stg
-    # Add your organization's patterns:
+    # Add your org's patterns:
     # - uat
     # - preprod
-    # - master (if used for production)
+
+# ============================================
+# LOGGING
+# ============================================
+
+logging:
+  format: json  # Options: json, text
+
+# ============================================
+# SECURITY POLICIES
+# ============================================
+
+policies:
+  # Git Operations
+  monitor_git_ops: true
+  block_force_git: true  # Block git push --force
   
-  # SQL Detection Mode
-  # When true, only flags destructive SQL operations (DROP, DELETE, TRUNCATE, etc.)
-  # When false, flags ALL database operations
+  # Production Environment Detection
+  detect_prod_env: true
+  
+  # SQL Detection (only flag destructive operations by default)
   only_destructive_sql: true
   
-  # Allowlist: Commands that are always permitted
-  # Use wildcards (*) for flexible matching
+  # Commands always allowed (safe operations)
   allowlist:
-    # Basic safe commands
     - "echo *"
-    - "cat *"
     - "ls *"
+    - "cat *"
     - "pwd"
-    - "whoami"
-    - "which *"
-    
-    # Git read operations
     - "git status"
     - "git diff"
     - "git log"
-    - "git show"
-    - "git branch"
-    - "git remote -v"
-    
-    # Package management (safe operations)
     - "npm install"
     - "npm test"
     - "npm run build"
-    - "yarn install"
-    - "pip install *"
-    
-    # Docker read operations
-    - "docker ps"
-    - "docker images"
-    - "docker logs *"
-    
-    # Kubernetes read operations
-    - "kubectl get *"
-    - "kubectl describe *"
-    - "kubectl logs *"
   
-  # Denylist: Patterns that are blocked or require approval
+  # Commands blocked or requiring approval
   denylist:
-    # Filesystem destruction
     - "rm -rf /"
-    - "rm -rf /*"
-    - "rm -rf ~"
-    - "rm -rf $HOME"
-    
-    # Privileged operations
     - "sudo rm"
-    - "sudo dd"
-    - "sudo mkfs"
-    
-    # Fork bombs and system damage
-    - ":(){ :|:& };:"
-    - "mkfs"
-    - "dd if=/dev"
-    - "> /etc/passwd"
-    - "> /etc/shadow"
-    
-    # Dangerous remote execution
+    - ":(){ :|:& };:"  # fork bomb
     - "curl * | sh"
-    - "curl * | bash"
-    - "wget * | sh"
     - "wget * | bash"
-    
-    # Destructive git operations (covered by monitor_git_ops, but adding for defense in depth)
     - "git push --force"
-    - "git push -f"
-    - "git filter-branch"
-    - "git filter-repo"
-    
-    # Destructive database operations (covered by SQL detection, but adding for defense)
     - "DROP DATABASE"
     - "DROP TABLE"
-    - "TRUNCATE TABLE"
 
-# Environment Variable Protection (Advanced)
+# ============================================
+# ENVIRONMENT VARIABLE PROTECTION (Optional)
+# ============================================
+
 env_protection:
   enabled: true
-  
-  # Masking mode: full, partial, hash, fake
-  # - full: Replace entire value with ********
-  # - partial: Show first/last few chars (e.g., abc***xyz)
-  # - hash: Show SHA256 hash prefix
-  # - fake: Generate realistic-looking fake values
-  masking_mode: partial
-  
-  # Explicitly protected variables (in addition to auto-detected ones)
-  protected_vars:
-    - MY_SECRET_KEY
-    - COMPANY_API_KEY
-    # Add your sensitive variables
-  
-  # Variables allowed to be read (not masked)
-  allow_read_vars:
-    - HOME
-    - USER
-    - PATH
-    - SHELL
-    - TERM
-    - LANG
-    - PWD
-    - TMPDIR
-    - EDITOR
-  
-  # Custom fake values for specific variables
-  fake_values:
-    DATABASE_URL: "postgresql://user:pass@localhost:5432/dev_db"
-    API_KEY: "dev_key_1234567890abcdef"
-  
-  # Block environment variable access commands
-  # When true, blocks commands like: printenv, env, cat .env, etc.
-  block_env_access: false
-  
-  # Block .env file reading
-  # When true, blocks attempts to read .env files
+  masking_mode: partial  # full, partial, hash, fake
   block_dotenv_read: true
 
 # ============================================
-# PRESET CONFIGURATIONS
-# Uncomment one of the presets below, or customize your own
+# NOTES
 # ============================================
-
-# # PRESET 1: Development (Relaxed)
-# guard_level:
-#   level: low
-#   allow_user_bypass: true
-# policies:
-#   monitor_git_ops: true
-#   block_force_git: false
-#   detect_prod_env: false
-#   only_destructive_sql: true
-
-# # PRESET 2: Team Environment (Balanced - DEFAULT)
-# guard_level:
-#   level: medium
-#   allow_user_bypass: true
-# policies:
-#   monitor_git_ops: true
-#   block_force_git: true
-#   detect_prod_env: true
-#   only_destructive_sql: true
-
-# # PRESET 3: Production (Strict)
-# guard_level:
-#   level: high
-#   allow_user_bypass: false
-# policies:
-#   monitor_git_ops: true
-#   block_force_git: true
-#   detect_prod_env: true
-#   only_destructive_sql: true
-#   allowlist:
-#     - "git status"
-#     - "git log"
-#     - "ls *"
-#     - "cat *"
-
-# # PRESET 4: Paranoid (Maximum Security)
-# guard_level:
-#   level: paranoid
-#   allow_user_bypass: false
-# policies:
-#   monitor_git_ops: true
-#   block_force_git: true
-#   detect_prod_env: true
-#   only_destructive_sql: true
-#   allowlist: []
+# 
+# For advanced configurations and presets, see: docs/CONFIGURATION.md
+# 
+# Quick override examples:
+#   VECTRA_GUARD_LEVEL=low vg exec "risky command"     # Temporary low protection
+#   VECTRA_GUARD_LEVEL=paranoid vg exec "prod deploy"  # Force paranoid mode
+# 
+# The 'auto' level is recommended - let Vectra Guard be smart about context!

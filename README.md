@@ -254,32 +254,61 @@ vectra-guard session show $VECTRAGUARD_SESSION_ID
 Create `vectra-guard.yaml` in your project or `~/.config/vectra-guard/config.yaml`:
 
 ```yaml
+# Simple, clean, rock solid protection
+
+guard_level:
+  level: auto  # Auto-detect context (recommended)
+  # Options: auto, low, medium, high, paranoid
+
+# Teach Vectra Guard your org's patterns
+production_indicators:
+  branches:
+    - main
+    - master
+    - production
+  keywords:
+    - prod
+    - production
+    - staging
+
 logging:
   format: json  # text or json
 
 policies:
+  monitor_git_ops: true
+  block_force_git: true
+  detect_prod_env: true
+  
   # Commands that are always allowed
   allowlist:
     - "echo *"
-    - "cat *"
     - "ls *"
+    - "git status"
     - "npm install"
     - "npm test"
-    - "git status"
-    - "git diff"
   
   # Patterns that are blocked or require approval
   denylist:
     - "rm -rf /"
     - "sudo rm"
-    - "sudo dd"
-    - "mkfs"
-    - "dd if="
     - ":(){ :|:& };:"  # fork bomb
     - "curl * | sh"
-    - "wget * | bash"
-    - "> /etc/passwd"
+    - "DROP DATABASE"
 ```
+
+### Auto-Detection (Smart Protection)
+
+When `level: auto`, Vectra Guard intelligently detects:
+- **Git branch** (main/master → strict, feature/* → relaxed)
+- **Command content** (deploy commands → strict)
+- **URLs** (api.prod.com → strict)
+- **Database names** (prod_db → strict)
+
+**Priority**: Most dangerous context wins (safety first!)
+
+**Override**: `VECTRA_GUARD_LEVEL=low vg exec "command"`
+
+**See**: [CONFIGURATION.md](CONFIGURATION.md) for detailed examples and presets
 
 ---
 
@@ -290,29 +319,36 @@ Vectra Guard provides multiple enforcement levels based on your security needs:
 ### Level 1: Opt-in Validation (Development)
 ```bash
 vectra-guard exec npm install
+vg exec npm install  # shorthand
 ```
 ✅ Good for: Development, testing, trusted environments  
 ⚠️ Can be bypassed if not using `exec` command
 
-### Level 2: Universal Shell Integration (Recommended)
+### Level 2: Universal Shell Integration (Recommended) ⭐
 ```bash
 ./scripts/install-universal-shell-protection.sh
 ```
 ✅ **Automatic protection** for all shell commands  
 ✅ Works in Cursor, VSCode, Terminal, everywhere  
 ✅ Transparent, no workflow changes  
+✅ **Auto-detects context** and adjusts security  
 ⚠️ Advanced bypass possible (requires expertise)
 
-### Level 3: Container Isolation (Maximum Security)
+### Level 3: Container Isolation (Optional)
 ```bash
-docker-compose up agent-prod
-```
-✅ **Complete isolation** - Agent runs in container  
-✅ Cannot bypass or tamper with protection  
-✅ Read-only filesystem, no network access  
-✅ Production-ready security  
+# Basic container with auto-detection
+docker-compose up vectra-guard
 
-**See**: [`docker-compose.yml`](docker-compose.yml) for three pre-configured security profiles (dev/prod/sandbox)
+# Strict isolation for untrusted code
+docker-compose up vectra-guard-isolated
+```
+✅ **Complete isolation** - runs in container  
+✅ Useful for testing or high-security scenarios  
+✅ Read-only filesystem options available  
+
+**Focus**: We recommend **Level 2 (Universal Shell)** with `auto` guard level for most users.
+
+**See**: [`docker-compose.yml`](docker-compose.yml) for optional containerized setup
 
 ---
 
@@ -471,33 +507,34 @@ vectra-guard session show $SESSION_ID > report.txt
 
 ---
 
-## 🐳 Container Deployment
+## 🐳 Container Deployment (Optional)
 
-For maximum security, run agents in isolated containers:
+For containerized testing or high-security scenarios:
 
 ```bash
 # Build container
 docker build -t vectra-guard .
 
-# Run with strict isolation (production)
-docker-compose up agent-prod
+# Run with auto-detection
+docker-compose up vectra-guard
 
-# Or run manually
+# Run with strict isolation
+docker-compose up vectra-guard-isolated
+
+# Or run manually with custom guard level
 docker run -it --rm \
-  --read-only \
-  --network none \
+  -e VECTRA_GUARD_LEVEL=auto \
+  -v "$(pwd)":/workspace \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  --security-opt seccomp=seccomp-profile.json \
-  -v "$(pwd)":/workspace:ro \
-  -v "$(pwd)/dist":/workspace/dist \
   vectra-guard:latest
 ```
 
-**Three pre-configured profiles in `docker-compose.yml`**:
-- **agent-dev**: Development with network access
-- **agent-prod**: Production with strict isolation
-- **agent-sandbox**: Maximum security for untrusted code
+**Two profiles in `docker-compose.yml`**:
+- **vectra-guard**: Standard containerized execution with auto-detection
+- **vectra-guard-isolated**: Strict isolation (read-only, no network) for untrusted code
+
+**Note**: Most users should use the **CLI tool** directly with universal shell protection. Containers are optional for specific use cases.
 
 ---
 
@@ -511,6 +548,8 @@ docker run -it --rm \
 - [x] Container isolation with Docker
 - [x] Seccomp syscall filtering
 - [x] Multiple enforcement modes
+- [x] **Auto-detection** (context-aware protection)
+- [x] Simplified configuration (clean, rock solid)
 - [ ] File operation monitoring (in progress)
 - [ ] Network policy enforcement
 - [ ] VSCode/Cursor extensions
@@ -608,11 +647,13 @@ For security issues, please email the maintainers directly rather than opening p
 
 ## 📚 Additional Resources
 
+- **[CONFIGURATION.md](CONFIGURATION.md)** - Detailed configuration guide with presets
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Step-by-step walkthrough
 - **[Project.md](Project.md)** - Original project vision and architecture
 - **[roadmap.md](roadmap.md)** - Detailed development roadmap and milestones
 - **[GO_PRACTICES.md](GO_PRACTICES.md)** - Go coding standards and best practices
 - **[Dockerfile](Dockerfile)** - Container image definition
-- **[docker-compose.yml](docker-compose.yml)** - Pre-configured security profiles
+- **[docker-compose.yml](docker-compose.yml)** - Optional container setup
 
 ---
 
@@ -635,30 +676,31 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 | Task | Command |
 |------|---------|
 | **Install protection** | `./scripts/install-universal-shell-protection.sh` |
-| **Initialize config** | `vectra-guard init` |
-| **Validate script** | `vectra-guard validate script.sh` |
-| **Explain risks** | `vectra-guard explain script.sh` |
-| **Protected execution** | `vectra-guard exec -- command` |
-| **Start session** | `vectra-guard session start --agent NAME` |
-| **View session** | `vectra-guard session show $SESSION_ID` |
-| **List sessions** | `vectra-guard session list` |
-| **Run in container** | `docker-compose up agent-prod` |
+| **Initialize config** | `vectra-guard init` (or `vg init`) |
+| **Validate script** | `vg validate script.sh` |
+| **Explain risks** | `vg explain script.sh` |
+| **Protected execution** | `vg exec -- command` |
+| **Override guard level** | `VECTRA_GUARD_LEVEL=low vg exec command` |
+| **Start session** | `vg session start --agent NAME` |
+| **View session** | `vg session show $SESSION_ID` |
+| **List sessions** | `vg session list` |
+| **Config examples** | See [CONFIGURATION.md](CONFIGURATION.md) |
 | **Run tests** | `go test ./...` |
 
 ---
 
 ## 💡 Pro Tips
 
-1. **Always use universal shell protection** for comprehensive coverage
-2. **Configure policies per project** with `vectra-guard.yaml` in repo root
-3. **Use container mode for production** or untrusted code
-4. **Review session logs regularly** to understand agent behavior
-5. **Share configs with team** via git for consistent protection
-6. **Enable interactive mode** for critical operations
-7. **Export audit logs** for compliance and security reviews
-8. **Test scripts before committing** with `vectra-guard validate`
-9. **Use allowlists generously** for known-safe commands
-10. **Keep denylists strict** to catch new threats
+1. **Use `level: auto`** for intelligent context-aware protection (recommended)
+2. **Install universal shell protection** for comprehensive coverage
+3. **Configure policies per project** with `vectra-guard.yaml` in repo root
+4. **Override when needed**: `VECTRA_GUARD_LEVEL=low vg exec command`
+5. **Review session logs regularly** to understand agent behavior
+6. **Share configs with team** via git for consistent protection
+7. **Teach it your patterns** in `production_indicators` for better detection
+8. **Test scripts before committing** with `vg validate script.sh`
+9. **Use the `vg` alias** for faster workflows
+10. **See presets** in [CONFIGURATION.md](CONFIGURATION.md) for quick setup
 
 ---
 

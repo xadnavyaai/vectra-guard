@@ -1,22 +1,21 @@
 version: '3.8'
 
+# Simplified Docker Compose for Vectra Guard
+# Primary usage: CLI tool (vectra-guard exec, vg exec)
+# This compose file is optional for containerized testing
+
 services:
-  # Development agent with medium restrictions
-  agent-dev:
+  # Single service - security adjusts based on VECTRA_GUARD_LEVEL
+  vectra-guard:
     build: .
     image: vectra-guard:latest
-    container_name: vectra-agent-dev
+    container_name: vectra-guard
     environment:
-      - AGENT_NAME=cursor-ai-dev
+      # Auto-detects context and adjusts protection accordingly
+      - VECTRA_GUARD_LEVEL=auto
       - WORKSPACE=/workspace
     volumes:
-      # Mount workspace (read-write)
       - ./:/workspace
-      # Separate writable scratch space
-      - agent-scratch:/workspace-rw
-    networks:
-      - agent-net
-    # No special capabilities
     cap_drop:
       - ALL
     security_opt:
@@ -24,85 +23,28 @@ services:
     stdin_open: true
     tty: true
 
-  # Production agent with strict restrictions
-  agent-prod:
+  # Optional: Strict isolation for testing untrusted code
+  vectra-guard-isolated:
     build: .
     image: vectra-guard:latest
-    container_name: vectra-agent-prod
+    container_name: vectra-guard-isolated
     environment:
-      - AGENT_NAME=cursor-ai-prod
+      - VECTRA_GUARD_LEVEL=paranoid
       - WORKSPACE=/workspace
     volumes:
-      # Mount workspace READ-ONLY
       - ./:/workspace:ro
-      # Writable output directory only
-      - agent-output:/workspace/dist
-    networks:
-      - none  # No network access
-    # Minimal capabilities
+    network_mode: none
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
       - seccomp=seccomp-profile.json
-    # Resource limits
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,mode=1777
     deploy:
       resources:
         limits:
           cpus: '2'
           memory: 2G
-    stdin_open: true
-    tty: true
-    read_only: true
-    tmpfs:
-      - /tmp:size=100M,mode=1777
-
-  # High-security agent (for untrusted code)
-  agent-sandbox:
-    build: .
-    image: vectra-guard:latest
-    container_name: vectra-agent-sandbox
-    environment:
-      - AGENT_NAME=untrusted-agent
-      - WORKSPACE=/workspace
-    volumes:
-      # Minimal mounts, all read-only
-      - ./:/workspace:ro
-    # No network
-    network_mode: none
-    # Drop all capabilities
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-      - apparmor=vectra-guard-strict
-    # Strict resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-    # Completely read-only filesystem
-    read_only: true
-    tmpfs:
-      - /tmp:size=50M,mode=1777,noexec,nosuid
-    # No stdin/stdout (log only)
-    stdin_open: false
-    tty: false
-    # Auto-remove after exit
-    rm: true
-
-networks:
-  agent-net:
-    driver: bridge
-    internal: false  # Allow internet
-  
-  none:
-    driver: none
-
-volumes:
-  agent-scratch:
-    driver: local
-  agent-output:
-    driver: local
 

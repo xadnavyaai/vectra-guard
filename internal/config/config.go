@@ -12,10 +12,11 @@ import (
 
 // Config represents the merged configuration for vectra-guard.
 type Config struct {
-	Logging       LoggingConfig       `yaml:"logging" toml:"logging" json:"logging"`
-	Policies      PolicyConfig        `yaml:"policies" toml:"policies" json:"policies"`
-	EnvProtection EnvProtectionConfig `yaml:"env_protection" toml:"env_protection" json:"env_protection"`
-	GuardLevel    GuardLevelConfig    `yaml:"guard_level" toml:"guard_level" json:"guard_level"`
+	Logging              LoggingConfig            `yaml:"logging" toml:"logging" json:"logging"`
+	Policies             PolicyConfig             `yaml:"policies" toml:"policies" json:"policies"`
+	EnvProtection        EnvProtectionConfig      `yaml:"env_protection" toml:"env_protection" json:"env_protection"`
+	GuardLevel           GuardLevelConfig         `yaml:"guard_level" toml:"guard_level" json:"guard_level"`
+	ProductionIndicators ProductionIndicatorsConfig `yaml:"production_indicators" toml:"production_indicators" json:"production_indicators"`
 }
 
 // LoggingConfig controls output formatting.
@@ -27,6 +28,7 @@ type LoggingConfig struct {
 type GuardLevel string
 
 const (
+	GuardLevelAuto     GuardLevel = "auto"     // Auto-detect based on context (recommended)
 	GuardLevelOff      GuardLevel = "off"      // No protection
 	GuardLevelLow      GuardLevel = "low"      // Only critical issues
 	GuardLevelMedium   GuardLevel = "medium"   // Critical + high issues (default)
@@ -64,6 +66,12 @@ type EnvProtectionConfig struct {
 	BlockDotenvRead bool              `yaml:"block_dotenv_read" toml:"block_dotenv_read" json:"block_dotenv_read"`
 }
 
+// ProductionIndicatorsConfig defines patterns to detect production environments.
+type ProductionIndicatorsConfig struct {
+	Branches []string `yaml:"branches" toml:"branches" json:"branches"`
+	Keywords []string `yaml:"keywords" toml:"keywords" json:"keywords"`
+}
+
 // DefaultConfig returns the in-process defaults.
 func DefaultConfig() Config {
 	return Config{
@@ -87,10 +95,14 @@ func DefaultConfig() Config {
 			BlockDotenvRead: true,  // Block .env file reads by default
 		},
 		GuardLevel: GuardLevelConfig{
-			Level:                GuardLevelMedium,
+			Level:                GuardLevelAuto, // Auto-detect by default (was GuardLevelMedium)
 			AllowUserBypass:      true,
 			BypassEnvVar:         "VECTRAGUARD_BYPASS",
 			RequireApprovalAbove: "medium",
+		},
+		ProductionIndicators: ProductionIndicatorsConfig{
+			Branches: []string{"main", "master", "production", "release"},
+			Keywords: []string{"prod", "production", "prd", "live", "staging", "stg"},
 		},
 	}
 }
@@ -208,6 +220,14 @@ func merge(dst *Config, src Config) {
 		dst.GuardLevel.RequireApprovalAbove = src.GuardLevel.RequireApprovalAbove
 	}
 	dst.GuardLevel.AllowUserBypass = src.GuardLevel.AllowUserBypass
+	
+	// Merge production indicators
+	if len(src.ProductionIndicators.Branches) > 0 {
+		dst.ProductionIndicators.Branches = src.ProductionIndicators.Branches
+	}
+	if len(src.ProductionIndicators.Keywords) > 0 {
+		dst.ProductionIndicators.Keywords = src.ProductionIndicators.Keywords
+	}
 }
 
 func exists(path string) bool {
@@ -227,7 +247,8 @@ func decodeYAML(data []byte) (Config, error) {
 			continue
 		}
 		if strings.HasSuffix(line, ":") {
-			switch strings.TrimSuffix(line, ":") {
+			key := strings.TrimSuffix(line, ":")
+			switch key {
 			case "logging":
 				mode = "logging"
 				listTarget = nil
@@ -236,6 +257,9 @@ func decodeYAML(data []byte) (Config, error) {
 				listTarget = nil
 			case "guard_level":
 				mode = "guard_level"
+				listTarget = nil
+			case "production_indicators":
+				mode = "production_indicators"
 				listTarget = nil
 			case "allowlist":
 				if mode == "policies" {
@@ -249,13 +273,23 @@ func decodeYAML(data []byte) (Config, error) {
 				if mode == "policies" {
 					listTarget = &cfg.Policies.ProdEnvPatterns
 				}
+			case "branches":
+				if mode == "production_indicators" {
+					listTarget = &cfg.ProductionIndicators.Branches
+				}
+			case "keywords":
+				if mode == "production_indicators" {
+					listTarget = &cfg.ProductionIndicators.Keywords
+				}
 			}
 			continue
 		}
 
 		if strings.HasPrefix(line, "- ") {
 			if listTarget != nil {
-				*listTarget = append(*listTarget, strings.TrimSpace(strings.TrimPrefix(line, "- ")))
+				item := strings.TrimSpace(strings.TrimPrefix(line, "- "))
+				item = strings.Trim(item, `"'`)
+				*listTarget = append(*listTarget, item)
 			}
 			continue
 		}
@@ -381,4 +415,181 @@ func FromContext(ctx context.Context) Config {
 		return cfg
 	}
 	return DefaultConfig()
+}
+
+// DetectionContext holds information about the execution context
+type DetectionContext struct {
+	Command      string
+	GitBranch    string
+	WorkingDir   string
+	Environment  map[string]string
+}
+
+// DetectGuardLevel analyzes the context and returns the appropriate guard level
+// If the configured level is not "auto", it returns the configured level as-is.
+// Otherwise, it intelligently detects based on the context.
+func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
+	// If not auto, return as configured
+	if cfg.GuardLevel.Level != GuardLevelAuto {
+		return cfg.GuardLevel.Level
+	}
+	
+	// Auto-detection logic: be safe, choose most protective level when in doubt
+	indicators := cfg.ProductionIndicators
+	if len(indicators.Branches) == 0 && len(indicators.Keywords) == 0 {
+		// Use defaults if not configured
+		indicators = DefaultConfig().ProductionIndicators
+	}
+	
+	// Check git branch first (strongest signal for production)
+	if ctx.GitBranch != "" {
+		branchLower := strings.ToLower(ctx.GitBranch)
+		for _, prodBranch := range indicators.Branches {
+			if branchLower == strings.ToLower(prodBranch) {
+				return GuardLevelParanoid // Production branch = paranoid
+			}
+		}
+		// Check if branch contains production keywords
+		for _, keyword := range indicators.Keywords {
+			if strings.Contains(branchLower, strings.ToLower(keyword)) {
+				return GuardLevelHigh // Branch name has prod indicator = high
+			}
+		}
+	}
+	
+	// Check command string for production indicators
+	if ctx.Command != "" {
+		cmdLower := strings.ToLower(ctx.Command)
+		highRiskKeywords := []string{}
+		
+		for _, keyword := range indicators.Keywords {
+			if strings.Contains(cmdLower, strings.ToLower(keyword)) {
+				// Check if in meaningful context
+				if isInMeaningfulContext(cmdLower, keyword) {
+					highRiskKeywords = append(highRiskKeywords, keyword)
+				}
+			}
+		}
+		
+		if len(highRiskKeywords) > 0 {
+			return GuardLevelHigh // Production in command = high
+		}
+		
+		// Check for deployment-related commands
+		deploymentKeywords := []string{"deploy", "release", "publish", "ship"}
+		for _, keyword := range deploymentKeywords {
+			if strings.Contains(cmdLower, keyword) {
+				return GuardLevelHigh // Deployment command = high
+			}
+		}
+	}
+	
+	// Check working directory for indicators
+	if ctx.WorkingDir != "" {
+		dirLower := strings.ToLower(ctx.WorkingDir)
+		for _, keyword := range indicators.Keywords {
+			if isInMeaningfulContext(dirLower, keyword) {
+				return GuardLevelHigh // Production path = high
+			}
+		}
+	}
+	
+	// Check environment variables
+	for key, value := range ctx.Environment {
+		keyLower := strings.ToLower(key)
+		valueLower := strings.ToLower(value)
+		
+		// Check for environment indicators in variable names or values
+		envIndicators := []string{"env", "environment", "stage", "tier"}
+		isEnvVar := false
+		for _, indicator := range envIndicators {
+			if strings.Contains(keyLower, indicator) {
+				isEnvVar = true
+				break
+			}
+		}
+		
+		if isEnvVar {
+			for _, keyword := range indicators.Keywords {
+				if strings.Contains(valueLower, strings.ToLower(keyword)) {
+					return GuardLevelHigh // Production env var = high
+				}
+			}
+		}
+	}
+	
+	// Default: medium (safe default, not too restrictive, not too permissive)
+	return GuardLevelMedium
+}
+
+// isInMeaningfulContext checks if a keyword appears in a meaningful context
+// (not just as a substring in unrelated words)
+func isInMeaningfulContext(text, keyword string) bool {
+	lower := strings.ToLower(text)
+	keyLower := strings.ToLower(keyword)
+	
+	// Check if keyword appears with typical delimiters (either side)
+	contexts := []string{
+		"/" + keyLower + "/",
+		"/" + keyLower + "-",
+		"/" + keyLower + "_",
+		"/" + keyLower + ".",
+		"-" + keyLower + "-",
+		"-" + keyLower + "/",
+		"-" + keyLower + "_",
+		"-" + keyLower + ".",
+		"_" + keyLower + "_",
+		"_" + keyLower + "/",
+		"_" + keyLower + "-",
+		"_" + keyLower + ".",
+		"." + keyLower + ".",
+		"." + keyLower + "/",
+		"." + keyLower + "-",
+		"@" + keyLower,
+		"=" + keyLower,
+		" " + keyLower + " ",
+		" " + keyLower + "-",
+		" " + keyLower + "/",
+		":" + keyLower,
+	}
+	
+	for _, ctx := range contexts {
+		if strings.Contains(lower, ctx) {
+			return true
+		}
+	}
+	
+	// Also check if at start or end with delimiter
+	if strings.HasPrefix(lower, keyLower+" ") || 
+	   strings.HasPrefix(lower, keyLower+"-") ||
+	   strings.HasPrefix(lower, keyLower+"_") ||
+	   strings.HasPrefix(lower, keyLower+".") ||
+	   strings.HasPrefix(lower, keyLower+"/") ||
+	   strings.HasSuffix(lower, " "+keyLower) ||
+	   strings.HasSuffix(lower, "-"+keyLower) ||
+	   strings.HasSuffix(lower, "_"+keyLower) ||
+	   strings.HasSuffix(lower, "."+keyLower) ||
+	   strings.HasSuffix(lower, "/"+keyLower) {
+		return true
+	}
+	
+	return false
+}
+
+// GetCurrentGitBranch attempts to detect the current git branch
+func GetCurrentGitBranch(workdir string) string {
+	// Try reading .git/HEAD
+	gitHeadPath := filepath.Join(workdir, ".git", "HEAD")
+	data, err := os.ReadFile(gitHeadPath)
+	if err != nil {
+		return ""
+	}
+	
+	content := strings.TrimSpace(string(data))
+	// Format: ref: refs/heads/branch-name
+	if strings.HasPrefix(content, "ref: refs/heads/") {
+		return strings.TrimPrefix(content, "ref: refs/heads/")
+	}
+	
+	return ""
 }

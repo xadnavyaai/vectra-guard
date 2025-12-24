@@ -107,8 +107,8 @@ func TestContextHelpers(t *testing.T) {
 func TestGuardLevelDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 	
-	if cfg.GuardLevel.Level != GuardLevelMedium {
-		t.Errorf("expected default guard level to be medium, got %s", cfg.GuardLevel.Level)
+	if cfg.GuardLevel.Level != GuardLevelAuto {
+		t.Errorf("expected default guard level to be auto, got %s", cfg.GuardLevel.Level)
 	}
 	
 	if !cfg.GuardLevel.AllowUserBypass {
@@ -151,6 +151,7 @@ func TestGuardLevelParsing(t *testing.T) {
 		yaml     string
 		expected GuardLevel
 	}{
+		{"auto level", "guard_level:\n  level: auto\n", GuardLevelAuto},
 		{"low level", "guard_level:\n  level: low\n", GuardLevelLow},
 		{"medium level", "guard_level:\n  level: medium\n", GuardLevelMedium},
 		{"high level", "guard_level:\n  level: high\n", GuardLevelHigh},
@@ -450,8 +451,385 @@ func TestConfigContextHelpers(t *testing.T) {
 	
 	// Test with nil context
 	defaultCfg := FromContext(nil)
-	if defaultCfg.GuardLevel.Level != GuardLevelMedium {
-		t.Error("should return default config for nil context")
+	if defaultCfg.GuardLevel.Level != GuardLevelAuto {
+		t.Errorf("should return default config (auto) for nil context, got %s", defaultCfg.GuardLevel.Level)
+	}
+}
+
+func TestProductionIndicatorsParsing(t *testing.T) {
+	yaml := `
+production_indicators:
+  branches:
+    - main
+    - master
+    - production
+  keywords:
+    - prod
+    - staging
+`
+	
+	cfg, err := decodeYAML([]byte(yaml))
+	if err != nil {
+		t.Fatalf("decode yaml: %v", err)
+	}
+	
+	expectedBranches := []string{"main", "master", "production"}
+	if len(cfg.ProductionIndicators.Branches) != len(expectedBranches) {
+		t.Errorf("expected %d branches, got %d", len(expectedBranches), len(cfg.ProductionIndicators.Branches))
+	}
+	
+	for i, branch := range expectedBranches {
+		if cfg.ProductionIndicators.Branches[i] != branch {
+			t.Errorf("expected branch %s, got %s", branch, cfg.ProductionIndicators.Branches[i])
+		}
+	}
+	
+	expectedKeywords := []string{"prod", "staging"}
+	if len(cfg.ProductionIndicators.Keywords) != len(expectedKeywords) {
+		t.Errorf("expected %d keywords, got %d", len(expectedKeywords), len(cfg.ProductionIndicators.Keywords))
+	}
+}
+
+func TestDetectGuardLevelGitBranch(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	tests := []struct {
+		name       string
+		branch     string
+		expected   GuardLevel
+		description string
+	}{
+		{
+			name:        "main branch",
+			branch:      "main",
+			expected:    GuardLevelParanoid,
+			description: "main branch should trigger paranoid mode",
+		},
+		{
+			name:        "master branch",
+			branch:      "master",
+			expected:    GuardLevelParanoid,
+			description: "master branch should trigger paranoid mode",
+		},
+		{
+			name:        "production branch",
+			branch:      "production",
+			expected:    GuardLevelParanoid,
+			description: "production branch should trigger paranoid mode",
+		},
+		{
+			name:        "feature branch",
+			branch:      "feature/new-feature",
+			expected:    GuardLevelMedium,
+			description: "feature branch should use medium (default)",
+		},
+		{
+			name:        "branch with prod in name",
+			branch:      "hotfix-prod-issue",
+			expected:    GuardLevelHigh,
+			description: "branch containing 'prod' should trigger high",
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := DetectionContext{
+				GitBranch: tt.branch,
+			}
+			
+			level := DetectGuardLevel(cfg, ctx)
+			
+			if level != tt.expected {
+				t.Errorf("%s: expected %s, got %s", tt.description, tt.expected, level)
+			}
+		})
+	}
+}
+
+func TestDetectGuardLevelCommand(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	tests := []struct {
+		name     string
+		command  string
+		expected GuardLevel
+	}{
+		{
+			name:     "deploy to production",
+			command:  "kubectl apply -f prod-config.yaml",
+			expected: GuardLevelHigh,
+		},
+		{
+			name:     "production database",
+			command:  "psql -h prod-db.company.com",
+			expected: GuardLevelHigh,
+		},
+		{
+			name:     "deploy command",
+			command:  "npm run deploy",
+			expected: GuardLevelHigh,
+		},
+		{
+			name:     "staging environment",
+			command:  "ssh user@staging.server.com",
+			expected: GuardLevelHigh,
+		},
+		{
+			name:     "local development",
+			command:  "npm test",
+			expected: GuardLevelMedium,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := DetectionContext{
+				Command: tt.command,
+			}
+			
+			level := DetectGuardLevel(cfg, ctx)
+			
+			if level != tt.expected {
+				t.Errorf("command %q: expected %s, got %s", tt.command, tt.expected, level)
+			}
+		})
+	}
+}
+
+func TestDetectGuardLevelNonAutoReturnsConfigured(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.GuardLevel.Level = GuardLevelHigh
+	
+	ctx := DetectionContext{
+		GitBranch: "main", // Would normally trigger paranoid
+		Command:   "deploy to prod", // Would normally trigger high
+	}
+	
+	level := DetectGuardLevel(cfg, ctx)
+	
+	// Should return configured level, not auto-detected
+	if level != GuardLevelHigh {
+		t.Errorf("when not auto, should return configured level (high), got %s", level)
+	}
+}
+
+func TestDetectGuardLevelPriorityMostDangerous(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	// Main branch (paranoid) + production keyword (high) = paranoid wins
+	ctx := DetectionContext{
+		GitBranch: "main",
+		Command:   "deploy to prod-server",
+	}
+	
+	level := DetectGuardLevel(cfg, ctx)
+	
+	if level != GuardLevelParanoid {
+		t.Errorf("most dangerous context should win: expected paranoid, got %s", level)
+	}
+}
+
+func TestIsInMeaningfulContext(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		keyword  string
+		expected bool
+	}{
+		{
+			name:     "keyword in URL",
+			text:     "https://api.prod.company.com",
+			keyword:  "prod",
+			expected: true,
+		},
+		{
+			name:     "keyword in path",
+			text:     "/var/www/production/app",
+			keyword:  "production",
+			expected: true,
+		},
+		{
+			name:     "keyword with dash",
+			text:     "deploy-prod-config",
+			keyword:  "prod",
+			expected: true,
+		},
+		{
+			name:     "keyword with underscore",
+			text:     "db_prod_users",
+			keyword:  "prod",
+			expected: true,
+		},
+		{
+			name:     "keyword at start",
+			text:     "prod-database",
+			keyword:  "prod",
+			expected: true,
+		},
+		{
+			name:     "keyword at end",
+			text:     "database-prod",
+			keyword:  "prod",
+			expected: true,
+		},
+		{
+			name:     "keyword as substring without delimiter",
+			text:     "reproduction",
+			keyword:  "prod",
+			expected: false,
+		},
+		{
+			name:     "keyword in word",
+			text:     "products",
+			keyword:  "prod",
+			expected: false,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isInMeaningfulContext(tt.text, tt.keyword)
+			
+			if result != tt.expected {
+				t.Errorf("text %q with keyword %q: expected %v, got %v", 
+					tt.text, tt.keyword, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestDetectGuardLevelEnvironmentVars(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	tests := []struct {
+		name     string
+		env      map[string]string
+		expected GuardLevel
+	}{
+		{
+			name: "production environment variable",
+			env: map[string]string{
+				"ENV": "production",
+			},
+			expected: GuardLevelHigh,
+		},
+		{
+			name: "staging environment",
+			env: map[string]string{
+				"ENVIRONMENT": "staging",
+			},
+			expected: GuardLevelHigh,
+		},
+		{
+			name: "development environment",
+			env: map[string]string{
+				"ENV": "development",
+			},
+			expected: GuardLevelMedium,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := DetectionContext{
+				Environment: tt.env,
+			}
+			
+			level := DetectGuardLevel(cfg, ctx)
+			
+			if level != tt.expected {
+				t.Errorf("expected %s, got %s", tt.expected, level)
+			}
+		})
+	}
+}
+
+func TestDetectGuardLevelWorkingDirectory(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	tests := []struct {
+		name       string
+		workingDir string
+		expected   GuardLevel
+	}{
+		{
+			name:       "production path",
+			workingDir: "/var/www/production/app",
+			expected:   GuardLevelHigh,
+		},
+		{
+			name:       "staging path",
+			workingDir: "/home/user/projects/staging-app",
+			expected:   GuardLevelHigh,
+		},
+		{
+			name:       "dev path",
+			workingDir: "/home/user/projects/my-app",
+			expected:   GuardLevelMedium,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := DetectionContext{
+				WorkingDir: tt.workingDir,
+			}
+			
+			level := DetectGuardLevel(cfg, ctx)
+			
+			if level != tt.expected {
+				t.Errorf("workdir %q: expected %s, got %s", tt.workingDir, tt.expected, level)
+			}
+		})
+	}
+}
+
+func TestProductionIndicatorsDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	expectedBranches := []string{"main", "master", "production", "release"}
+	if len(cfg.ProductionIndicators.Branches) != len(expectedBranches) {
+		t.Errorf("expected %d default branches, got %d", len(expectedBranches), len(cfg.ProductionIndicators.Branches))
+	}
+	
+	expectedKeywords := []string{"prod", "production", "prd", "live", "staging", "stg"}
+	if len(cfg.ProductionIndicators.Keywords) != len(expectedKeywords) {
+		t.Errorf("expected %d default keywords, got %d", len(expectedKeywords), len(cfg.ProductionIndicators.Keywords))
+	}
+}
+
+func TestCompleteConfigWithProductionIndicators(t *testing.T) {
+	yaml := `
+guard_level:
+  level: auto
+
+production_indicators:
+  branches:
+    - main
+    - production
+  keywords:
+    - prod
+    - live
+
+policies:
+  monitor_git_ops: true
+`
+	
+	cfg, err := decodeYAML([]byte(yaml))
+	if err != nil {
+		t.Fatalf("decode yaml: %v", err)
+	}
+	
+	if cfg.GuardLevel.Level != GuardLevelAuto {
+		t.Errorf("expected auto guard level, got %s", cfg.GuardLevel.Level)
+	}
+	
+	if len(cfg.ProductionIndicators.Branches) != 2 {
+		t.Errorf("expected 2 branches, got %d", len(cfg.ProductionIndicators.Branches))
+	}
+	
+	if len(cfg.ProductionIndicators.Keywords) != 2 {
+		t.Errorf("expected 2 keywords, got %d", len(cfg.ProductionIndicators.Keywords))
 	}
 }
 
