@@ -17,6 +17,7 @@ type Config struct {
 	EnvProtection        EnvProtectionConfig      `yaml:"env_protection" toml:"env_protection" json:"env_protection"`
 	GuardLevel           GuardLevelConfig         `yaml:"guard_level" toml:"guard_level" json:"guard_level"`
 	ProductionIndicators ProductionIndicatorsConfig `yaml:"production_indicators" toml:"production_indicators" json:"production_indicators"`
+	Sandbox              SandboxConfig            `yaml:"sandbox" toml:"sandbox" json:"sandbox"`
 }
 
 // LoggingConfig controls output formatting.
@@ -72,6 +73,69 @@ type ProductionIndicatorsConfig struct {
 	Keywords []string `yaml:"keywords" toml:"keywords" json:"keywords"`
 }
 
+// SandboxMode determines when to use sandboxing
+type SandboxMode string
+
+const (
+	SandboxModeAuto  SandboxMode = "auto"  // Auto-detect based on risk
+	SandboxModeAlways SandboxMode = "always" // Always sandbox
+	SandboxModeRisky  SandboxMode = "risky"  // Only high/critical risk
+	SandboxModeNever  SandboxMode = "never"  // Never sandbox
+)
+
+// SandboxSecurityLevel controls isolation strength
+type SandboxSecurityLevel string
+
+const (
+	SandboxSecurityPermissive SandboxSecurityLevel = "permissive" // Minimal isolation
+	SandboxSecurityBalanced   SandboxSecurityLevel = "balanced"   // Good balance (default)
+	SandboxSecurityStrict     SandboxSecurityLevel = "strict"     // Strong isolation
+	SandboxSecurityParanoid   SandboxSecurityLevel = "paranoid"   // Maximum isolation
+)
+
+// SandboxConfig controls sandbox execution behavior
+type SandboxConfig struct {
+	// Core settings
+	Enabled        bool                 `yaml:"enabled" toml:"enabled" json:"enabled"`
+	Mode           SandboxMode          `yaml:"mode" toml:"mode" json:"mode"`
+	SecurityLevel  SandboxSecurityLevel `yaml:"security_level" toml:"security_level" json:"security_level"`
+	
+	// Runtime configuration
+	Runtime        string `yaml:"runtime" toml:"runtime" json:"runtime"` // docker, podman, process
+	Image          string `yaml:"image" toml:"image" json:"image"`
+	Timeout        int    `yaml:"timeout" toml:"timeout" json:"timeout"` // seconds
+	
+	// Cache configuration
+	EnableCache    bool     `yaml:"enable_cache" toml:"enable_cache" json:"enable_cache"`
+	CacheDirs      []string `yaml:"cache_dirs" toml:"cache_dirs" json:"cache_dirs"`
+	
+	// Network configuration
+	NetworkMode    string   `yaml:"network_mode" toml:"network_mode" json:"network_mode"` // none, restricted, full
+	
+	// Security profiles
+	SeccompProfile string   `yaml:"seccomp_profile" toml:"seccomp_profile" json:"seccomp_profile"`
+	
+	// Environment
+	EnvWhitelist   []string `yaml:"env_whitelist" toml:"env_whitelist" json:"env_whitelist"`
+	
+	// Custom mounts
+	BindMounts     []BindMountConfig `yaml:"bind_mounts" toml:"bind_mounts" json:"bind_mounts"`
+	
+	// Observability
+	EnableMetrics  bool   `yaml:"enable_metrics" toml:"enable_metrics" json:"enable_metrics"`
+	LogOutput      bool   `yaml:"log_output" toml:"log_output" json:"log_output"`
+	
+	// Trust store
+	TrustStorePath string `yaml:"trust_store_path" toml:"trust_store_path" json:"trust_store_path"`
+}
+
+// BindMountConfig represents a bind mount configuration
+type BindMountConfig struct {
+	HostPath      string `yaml:"host_path" toml:"host_path" json:"host_path"`
+	ContainerPath string `yaml:"container_path" toml:"container_path" json:"container_path"`
+	ReadOnly      bool   `yaml:"read_only" toml:"read_only" json:"read_only"`
+}
+
 // DefaultConfig returns the in-process defaults.
 func DefaultConfig() Config {
 	return Config{
@@ -103,6 +167,25 @@ func DefaultConfig() Config {
 		ProductionIndicators: ProductionIndicatorsConfig{
 			Branches: []string{"main", "master", "production", "release"},
 			Keywords: []string{"prod", "production", "prd", "live", "staging", "stg"},
+		},
+		Sandbox: SandboxConfig{
+			Enabled:       true,
+			Mode:          SandboxModeAuto,
+			SecurityLevel: SandboxSecurityBalanced,
+			Runtime:       "docker", // docker, podman, or process
+			Image:         "ubuntu:22.04",
+			Timeout:       300, // 5 minutes
+			EnableCache:   true,
+			CacheDirs:     []string{},
+			NetworkMode:   "restricted",
+			EnvWhitelist: []string{
+				"HOME", "USER", "PATH", "SHELL", "TERM",
+				"LANG", "LC_ALL", "PWD", "OLDPWD",
+			},
+			BindMounts:     []BindMountConfig{},
+			EnableMetrics:  true,
+			LogOutput:      false,
+			TrustStorePath: "",
 		},
 	}
 }
@@ -228,6 +311,46 @@ func merge(dst *Config, src Config) {
 	if len(src.ProductionIndicators.Keywords) > 0 {
 		dst.ProductionIndicators.Keywords = src.ProductionIndicators.Keywords
 	}
+	
+	// Merge sandbox configuration
+	if src.Sandbox.Mode != "" {
+		dst.Sandbox.Mode = src.Sandbox.Mode
+	}
+	if src.Sandbox.SecurityLevel != "" {
+		dst.Sandbox.SecurityLevel = src.Sandbox.SecurityLevel
+	}
+	if src.Sandbox.Runtime != "" {
+		dst.Sandbox.Runtime = src.Sandbox.Runtime
+	}
+	if src.Sandbox.Image != "" {
+		dst.Sandbox.Image = src.Sandbox.Image
+	}
+	if src.Sandbox.Timeout > 0 {
+		dst.Sandbox.Timeout = src.Sandbox.Timeout
+	}
+	if src.Sandbox.NetworkMode != "" {
+		dst.Sandbox.NetworkMode = src.Sandbox.NetworkMode
+	}
+	if src.Sandbox.SeccompProfile != "" {
+		dst.Sandbox.SeccompProfile = src.Sandbox.SeccompProfile
+	}
+	if src.Sandbox.TrustStorePath != "" {
+		dst.Sandbox.TrustStorePath = src.Sandbox.TrustStorePath
+	}
+	if len(src.Sandbox.EnvWhitelist) > 0 {
+		dst.Sandbox.EnvWhitelist = src.Sandbox.EnvWhitelist
+	}
+	if len(src.Sandbox.CacheDirs) > 0 {
+		dst.Sandbox.CacheDirs = src.Sandbox.CacheDirs
+	}
+	if len(src.Sandbox.BindMounts) > 0 {
+		dst.Sandbox.BindMounts = src.Sandbox.BindMounts
+	}
+	// Copy boolean fields
+	dst.Sandbox.Enabled = src.Sandbox.Enabled
+	dst.Sandbox.EnableCache = src.Sandbox.EnableCache
+	dst.Sandbox.EnableMetrics = src.Sandbox.EnableMetrics
+	dst.Sandbox.LogOutput = src.Sandbox.LogOutput
 }
 
 func exists(path string) bool {
@@ -260,6 +383,9 @@ func decodeYAML(data []byte) (Config, error) {
 				listTarget = nil
 			case "production_indicators":
 				mode = "production_indicators"
+				listTarget = nil
+			case "sandbox":
+				mode = "sandbox"
 				listTarget = nil
 			case "allowlist":
 				if mode == "policies" {
@@ -329,6 +455,31 @@ func decodeYAML(data []byte) (Config, error) {
 					cfg.Policies.DetectProdEnv = value == "true"
 				case "only_destructive_sql":
 					cfg.Policies.OnlyDestructiveSQL = value == "true"
+				}
+			case "sandbox":
+				switch key {
+				case "enabled":
+					cfg.Sandbox.Enabled = value == "true"
+				case "mode":
+					cfg.Sandbox.Mode = SandboxMode(value)
+				case "security_level":
+					cfg.Sandbox.SecurityLevel = SandboxSecurityLevel(value)
+				case "runtime":
+					cfg.Sandbox.Runtime = value
+				case "image":
+					cfg.Sandbox.Image = value
+				case "network_mode":
+					cfg.Sandbox.NetworkMode = value
+				case "enable_cache":
+					cfg.Sandbox.EnableCache = value == "true"
+				case "enable_metrics":
+					cfg.Sandbox.EnableMetrics = value == "true"
+				case "log_output":
+					cfg.Sandbox.LogOutput = value == "true"
+				case "trust_store_path":
+					cfg.Sandbox.TrustStorePath = value
+				case "seccomp_profile":
+					cfg.Sandbox.SeccompProfile = value
 				}
 			}
 		}

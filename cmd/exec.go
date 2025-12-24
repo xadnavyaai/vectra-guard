@@ -11,6 +11,7 @@ import (
 	"github.com/vectra-guard/vectra-guard/internal/analyzer"
 	"github.com/vectra-guard/vectra-guard/internal/config"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
+	"github.com/vectra-guard/vectra-guard/internal/sandbox"
 	"github.com/vectra-guard/vectra-guard/internal/session"
 )
 
@@ -101,11 +102,29 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		// Handle interactive approval or blocking
 		if requiresApproval {
 			if interactive {
-				if !promptForApproval(riskLevel, cmdString, filteredFindings) {
+				approval := promptForApproval(riskLevel, cmdString, filteredFindings)
+				if !approval.approved {
 					logger.Info("command execution denied by user", map[string]any{
 						"command": cmdString,
 					})
 					return &exitError{message: "execution denied", code: 3}
+				}
+				
+				// Handle "remember" functionality
+				if approval.remember && cfg.Sandbox.Enabled {
+					trustStore, err := sandbox.NewTrustStore(cfg.Sandbox.TrustStorePath)
+					if err == nil {
+						duration := time.Duration(0) // Never expire by default
+						if approval.duration > 0 {
+							duration = approval.duration
+						}
+						if err := trustStore.Add(cmdString, duration, "User approved"); err == nil {
+							fmt.Fprintln(os.Stderr, "✅ Approved and remembered")
+							logger.Info("command added to trust store", map[string]any{
+								"command": cmdString,
+							})
+						}
+					}
 				}
 			} else {
 				logger.Error("risky command blocked", map[string]any{
@@ -122,14 +141,25 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 	}
 
-	// Execute command
+	// Create sandbox executor
+	executor, err := sandbox.NewExecutor(cfg, logger)
+	if err != nil {
+		logger.Error("failed to initialize sandbox executor", map[string]any{
+			"error": err.Error(),
+		})
+		// Fallback to direct execution if sandbox init fails
+		return executeCommandDirectly(cmdArgs)
+	}
+	
+	// Decide execution mode (host vs sandbox)
+	decision := executor.DecideExecutionMode(ctx, cmdArgs, riskLevel, filteredFindings)
+	
+	// Show user-friendly notice
+	displayExecutionNotice(decision, riskLevel)
+	
+	// Execute command in chosen mode
 	start := time.Now()
-	cmd := exec.Command(cmdName, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	err := cmd.Run()
+	err = executor.Execute(ctx, cmdArgs, decision)
 	duration := time.Since(start)
 
 	exitCode := 0
@@ -140,6 +170,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			logger.Error("command execution failed", map[string]any{
 				"command": cmdString,
 				"error":   err.Error(),
+				"mode":    decision.Mode,
 			})
 			return fmt.Errorf("execute command: %w", err)
 		}
@@ -185,7 +216,15 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 	return nil
 }
 
-func promptForApproval(riskLevel, cmdString string, findings []analyzer.Finding) bool {
+type approvalResult struct {
+	approved bool
+	remember bool
+	duration time.Duration
+}
+
+func promptForApproval(riskLevel, cmdString string, findings []analyzer.Finding) approvalResult {
+	result := approvalResult{approved: false, remember: false, duration: 0}
+	
 	fmt.Fprintf(os.Stderr, "\n⚠️  Command requires approval\n")
 	fmt.Fprintf(os.Stderr, "Command: %s\n", cmdString)
 	fmt.Fprintf(os.Stderr, "Risk Level: %s\n\n", strings.ToUpper(riskLevel))
@@ -199,13 +238,28 @@ func promptForApproval(riskLevel, cmdString string, findings []analyzer.Finding)
 		fmt.Fprintln(os.Stderr)
 	}
 
-	fmt.Fprintf(os.Stderr, "Do you want to proceed? [y/N]: ")
+	fmt.Fprintf(os.Stderr, "Options:\n")
+	fmt.Fprintf(os.Stderr, "  y  - Yes, run once\n")
+	fmt.Fprintf(os.Stderr, "  r  - Yes, and remember (trust permanently)\n")
+	fmt.Fprintf(os.Stderr, "  n  - No, cancel\n")
+	fmt.Fprintf(os.Stderr, "\nChoose [y/r/N]: ")
 	
 	var response string
 	fmt.Scanln(&response)
 	
 	response = strings.ToLower(strings.TrimSpace(response))
-	return response == "y" || response == "yes"
+	
+	switch response {
+	case "y", "yes":
+		result.approved = true
+	case "r", "remember":
+		result.approved = true
+		result.remember = true
+	default:
+		result.approved = false
+	}
+	
+	return result
 }
 
 // filterFindingsByGuardLevel filters findings based on the configured guard level
@@ -282,6 +336,42 @@ func isLikelyAgentBypass(value string) bool {
 	}
 	
 	return false
+}
+
+// displayExecutionNotice shows a user-friendly notice about execution mode
+func displayExecutionNotice(decision sandbox.ExecutionDecision, riskLevel string) {
+	if decision.Mode == sandbox.ExecutionModeHost {
+		// Only show notice for interesting cases
+		if riskLevel != "low" && decision.Reason != "" {
+			fmt.Fprintf(os.Stderr, "🏠 Running on host: %s\n", decision.Reason)
+		}
+		return
+	}
+	
+	// Sandbox execution - always inform user
+	notice := "📦 Running in sandbox"
+	
+	if decision.ShouldCache {
+		notice += " (cached)"
+	}
+	
+	notice += "."
+	
+	// Explain the "why"
+	if decision.Reason != "" {
+		reasonParts := strings.Split(decision.Reason, "+")
+		if len(reasonParts) > 1 {
+			// Multiple reasons: format nicely
+			notice += fmt.Sprintf("\n   Why: %s", strings.TrimSpace(reasonParts[0]))
+			for _, part := range reasonParts[1:] {
+				notice += fmt.Sprintf(" + %s", strings.TrimSpace(part))
+			}
+		} else {
+			notice += fmt.Sprintf("\n   Why: %s", decision.Reason)
+		}
+	}
+	
+	fmt.Fprintln(os.Stderr, notice)
 }
 
 // executeCommandDirectly executes a command without protection

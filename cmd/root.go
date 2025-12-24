@@ -122,6 +122,57 @@ func execute(args []string) error {
 		default:
 			return usageError()
 		}
+	case "trust":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		trustCmd := subArgs[0]
+		trustArgs := subArgs[1:]
+		
+		switch trustCmd {
+		case "list":
+			return runTrustList(ctx)
+		case "add":
+			if len(trustArgs) < 1 {
+				return usageError()
+			}
+			subFlags := flag.NewFlagSet("trust-add", flag.ContinueOnError)
+			note := subFlags.String("note", "", "Note about why this command is trusted")
+			duration := subFlags.String("duration", "", "Trust duration (e.g., 24h, 7d)")
+			if err := subFlags.Parse(trustArgs[1:]); err != nil {
+				return err
+			}
+			return runTrustAdd(ctx, trustArgs[0], *note, *duration)
+		case "remove":
+			if len(trustArgs) < 1 {
+				return usageError()
+			}
+			return runTrustRemove(ctx, trustArgs[0])
+		case "clean":
+			return runTrustClean(ctx)
+		default:
+			return usageError()
+		}
+	case "metrics":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		metricsCmd := subArgs[0]
+		metricsArgs := subArgs[1:]
+		
+		switch metricsCmd {
+		case "show":
+			subFlags := flag.NewFlagSet("metrics-show", flag.ContinueOnError)
+			jsonOutput := subFlags.Bool("json", false, "Output in JSON format")
+			if err := subFlags.Parse(metricsArgs); err != nil {
+				return err
+			}
+			return runMetricsShow(ctx, *jsonOutput)
+		case "reset":
+			return runMetricsReset(ctx)
+		default:
+			return usageError()
+		}
 	default:
 		return usageError()
 	}
@@ -141,6 +192,12 @@ Commands:
   session end <id>             End an agent session
   session list                 List all sessions
   session show <id>            Show session details
+  trust list                   List trusted commands
+  trust add <cmd>              Add command to trust store
+  trust remove <cmd>           Remove command from trust store
+  trust clean                  Clean expired entries
+  metrics show [--json]        Show sandbox metrics
+  metrics reset                Reset metrics
 `, name)
 	return fmt.Errorf("%s", usage)
 }

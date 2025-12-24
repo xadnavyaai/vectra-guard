@@ -1,0 +1,43 @@
+# Vectra Guard - CI/CD Preset
+# Balanced protection for automated pipelines
+
+guard_level:
+  level: high  # Strong protection but allow automation
+  allow_user_bypass: false  # No interactive prompts in CI
+
+sandbox:
+  enabled: true
+  mode: risky  # Sandbox only high-risk commands
+  security_level: balanced  # Good isolation, reasonable speed
+  runtime: docker
+  image: ubuntu:22.04
+  timeout: 900  # 15 minutes for CI builds
+  enable_cache: true  # Speed up CI with caching
+  network_mode: restricted  # Allow outbound, block inbound
+  enable_metrics: true
+  
+policies:
+  monitor_git_ops: true
+  block_force_git: true
+  detect_prod_env: true
+  only_destructive_sql: true
+  
+  allowlist:
+    - "npm ci"
+    - "npm test"
+    - "npm run build"
+    - "pip install -r requirements.txt"
+    - "cargo test"
+    - "go test"
+    - "make test"
+    - "docker build"
+
+logging:
+  format: json  # Structured logs for CI parsing
+
+env_protection:
+  enabled: true
+  masking_mode: partial
+  block_dotenv_read: true
+  block_env_access: false  # Allow env in CI
+

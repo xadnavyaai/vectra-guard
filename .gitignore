@@ -8,6 +8,10 @@
 *.so
 *.dylib
 
+# Main binary
+vectra-guard
+vg
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -30,6 +34,8 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+.DS_Store
+*/.DS_Store
 
 # Build artifacts
 dist/

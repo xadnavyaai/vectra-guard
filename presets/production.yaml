@@ -1,0 +1,40 @@
+# Vectra Guard - Production Preset
+# Maximum protection for production environments
+
+guard_level:
+  level: paranoid  # Require approval for everything
+  allow_user_bypass: false  # No bypasses in production
+
+sandbox:
+  enabled: true
+  mode: always  # Always sandbox, no exceptions
+  security_level: paranoid  # Maximum isolation
+  runtime: docker
+  image: ubuntu:22.04
+  timeout: 300
+  enable_cache: false  # No caching for reproducibility
+  network_mode: none  # No network access
+  enable_metrics: true
+  
+policies:
+  monitor_git_ops: true
+  block_force_git: true  # Block force push
+  detect_prod_env: true
+  only_destructive_sql: false  # Flag all SQL
+  
+  denylist:
+    - "rm -rf"
+    - "sudo"
+    - "DROP DATABASE"
+    - "DROP TABLE"
+    - "git push --force"
+
+logging:
+  format: json  # Structured logging for production
+
+env_protection:
+  enabled: true
+  masking_mode: full  # Full masking of sensitive vars
+  block_dotenv_read: true
+  block_env_access: true
+

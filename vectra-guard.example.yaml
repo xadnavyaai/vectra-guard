@@ -103,6 +103,90 @@ env_protection:
   block_dotenv_read: true
 
 # ============================================
+# SANDBOX EXECUTION (Phase 1-7 Implementation)
+# ============================================
+
+sandbox:
+  # Enable sandbox execution
+  enabled: true
+  
+  # Execution mode: auto (smart), always, risky (high-risk only), never
+  # 'auto' is recommended - sandbox medium+ risk commands automatically
+  mode: auto
+  
+  # Security level: permissive, balanced, strict, paranoid
+  # balanced = good isolation without sacrificing speed
+  security_level: balanced
+  
+  # Runtime: docker, podman, process
+  # docker = most compatible, process = fastest (Linux only)
+  runtime: docker
+  
+  # Container image to use
+  image: ubuntu:22.04
+  
+  # Execution timeout (seconds)
+  timeout: 300
+  
+  # Cache strategy for faster dev cycles
+  enable_cache: true
+  # cache_dirs:
+  #   - ~/.npm
+  #   - ~/.cargo
+  #   - ~/go/pkg
+  
+  # Network mode: none, restricted, full
+  # restricted = allow outbound, block inbound (recommended)
+  network_mode: restricted
+  
+  # Seccomp profile path (optional, for strict/paranoid)
+  # seccomp_profile: /path/to/seccomp-profile.json
+  
+  # Environment variables to pass through
+  env_whitelist:
+    - HOME
+    - USER
+    - PATH
+    - SHELL
+    - TERM
+    - PWD
+  
+  # Custom bind mounts (optional)
+  # bind_mounts:
+  #   - host_path: /path/on/host
+  #     container_path: /path/in/container
+  #     read_only: false
+  
+  # Observability and metrics
+  enable_metrics: true
+  log_output: false
+  
+  # Trust store path (for "approve and remember")
+  # trust_store_path: ~/.vectra-guard/trust.json
+
+# ============================================
+# DEVELOPER PRESET (Quick Start)
+# ============================================
+# 
+# For a "just works" developer experience, use these settings:
+# 
+# guard_level:
+#   level: low              # Minimal friction
+# 
+# sandbox:
+#   enabled: true
+#   mode: auto              # Smart sandboxing
+#   security_level: permissive  # Fast, less isolated
+#   enable_cache: true      # Reuse deps
+#   network_mode: full      # No network restrictions
+# 
+# This gives you:
+# - Low-friction development
+# - Automatic sandboxing for risky commands
+# - Fast execution with caching
+# - "Approve and remember" for trusted commands
+
+# ============================================
 # NOTES
 # ============================================
 # 

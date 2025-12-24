@@ -1,0 +1,40 @@
+# Vectra Guard - Developer Preset
+# Optimized for local development with minimal friction
+
+guard_level:
+  level: low  # Only block critical issues
+  allow_user_bypass: true
+
+sandbox:
+  enabled: true
+  mode: auto  # Smart sandboxing based on risk
+  security_level: permissive  # Minimal isolation for speed
+  runtime: docker
+  image: ubuntu:22.04
+  timeout: 600  # 10 minutes for long builds
+  enable_cache: true
+  network_mode: full  # No network restrictions
+  enable_metrics: true
+  
+policies:
+  monitor_git_ops: true
+  block_force_git: false  # Allow force push in dev
+  detect_prod_env: true
+  only_destructive_sql: true
+  
+  allowlist:
+    - "npm install"
+    - "npm run"
+    - "npm test"
+    - "yarn install"
+    - "pip install"
+    - "go install"
+    - "cargo build"
+    - "make"
+
+logging:
+  format: text  # Human-readable for development
+
+env_protection:
+  enabled: false  # Don't block env access in dev
+
