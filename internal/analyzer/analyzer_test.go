@@ -189,8 +189,6 @@ func TestDestructiveSQLInProduction(t *testing.T) {
 		t.Error("expected critical severity for destructive SQL in production")
 	}
 }
-<<<<<<< Current (Your changes)
-=======
 
 func TestGitOperationsDisabledByConfig(t *testing.T) {
 	script := "git push --force origin main"
@@ -523,4 +521,3 @@ func TestEdgeCases(t *testing.T) {
 		})
 	}
 }
->>>>>>> Incoming (Background Agent changes)

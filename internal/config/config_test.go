@@ -172,8 +172,6 @@ func TestGuardLevelParsing(t *testing.T) {
 	}
 }
 
-<<<<<<< Current (Your changes)
-=======
 func TestGuardLevelValidation(t *testing.T) {
 	validLevels := []GuardLevel{
 		GuardLevelOff,
@@ -457,7 +455,6 @@ func TestConfigContextHelpers(t *testing.T) {
 	}
 }
 
->>>>>>> Incoming (Background Agent changes)
 func writeFile(t *testing.T, path string, body string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
