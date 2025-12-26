@@ -65,90 +65,141 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 		// Enhanced destructive file operations detection
 		// Check for ANY rm command targeting root or system directories
 		if strings.Contains(lower, "rm ") {
-			// Check for root deletion patterns (catches rm -rf /, rm -r /*, rm -rf /*, etc.)
-			rootDeletePatterns := []string{
-				"rm -rf /",      // Original pattern
-				"rm -r /",       // Without force flag
-				"rm -rf / ",     // With trailing space
-				"rm -r / ",      // Without force, with space
-				"rm -rf /*",     // With wildcard
-				"rm -r /*",      // Without force, with wildcard
-				"rm -rf /* ",    // With wildcard and space
-				"rm -r /* ",     // Without force, wildcard, space
-				"rm -rf / *",    // Space between / and *
-				"rm -r / *",     // Without force, space between
-				"rm -rf /bin",   // System directories
-				"rm -rf /usr",   // System directories
-				"rm -rf /etc",   // System directories
-				"rm -rf /var",   // System directories
-				"rm -rf /opt",   // System directories
-				"rm -rf /sbin",  // System directories
-				"rm -rf /lib",   // System directories
-				"rm -rf /lib64", // System directories
-				"rm -rf /sys",   // System directories
-				"rm -rf /proc",  // System directories
-				"rm -rf /dev",   // System directories
-				"rm -rf /boot",  // System directories
-				"rm -rf /root",  // Root home directory
-				"rm -rf /lib64", // System directories
-				"rm -rf /usr/local",
-				"rm -rf /home",
-				"rm -rf /srv",
-				"rm -rf /var/log",
-				"rm -rf /etc/ssh",
-				"rm -rf /system",
-				"rm -rf /library",
-				"rm -rf /applications",
-			}
+			homeDeleteFound := false
 
-			for _, pattern := range rootDeletePatterns {
-				if strings.Contains(lower, pattern) {
-					findings = append(findings, Finding{
-						Severity:       "critical",
-						Code:           "DANGEROUS_DELETE_ROOT",
-						Description:    fmt.Sprintf("Recursive delete targeting root or system directory detected: %s", pattern),
-						Line:           lineNum,
-						Recommendation: "BLOCKED: This command would destroy the system. Never delete from root or system directories.",
-					})
-					break // Only report once
-				}
-			}
-
-			// Check for home directory deletion patterns
+			// IMPORTANT: Check home directory deletion patterns FIRST (before root patterns)
 			// Pattern: rm -rf ~/* or rm -rf $HOME/* (could delete user's entire home)
 			homeDeletePatterns := []string{
 				"rm -rf ~/*",
 				"rm -r ~/*",
 				"rm -rf ~/ *",
 				"rm -r ~/ *",
-				"rm -rf $home/*",
-				"rm -r $home/*",
-				"rm -rf $home/ *",
-				"rm -r $home/ *",
-				"rm -rf $home/*",
-				"rm -r $home/*",
-				"rm -rf $home/ *",
-				"rm -r $home/ *",
+				"rm -rf $HOME/*",
+				"rm -r $HOME/*",
+				"rm -rf $HOME/ *",
+				"rm -r $HOME/ *",
+			}
+
+			// Also check for expanded home paths like /home/username/* or /home/*
+			if strings.Contains(lower, "rm -rf /home/") && strings.Contains(lower, "/*") {
+				homeDeletePatterns = append(homeDeletePatterns, "rm -rf /home/")
+			}
+			if strings.Contains(lower, "rm -rf /home/*") || strings.Contains(lower, "rm -r /home/*") {
+				homeDeletePatterns = append(homeDeletePatterns, "rm -rf /home/*", "rm -r /home/*")
 			}
 
 			for _, pattern := range homeDeletePatterns {
 				if strings.Contains(lower, pattern) {
 					findings = append(findings, Finding{
-						Severity:       "high",
+						Severity:       "critical",
 						Code:           "DANGEROUS_DELETE_HOME",
 						Description:    "Recursive delete targeting home directory detected",
 						Line:           lineNum,
-						Recommendation: "This could delete all user data. Specify exact paths instead of wildcards.",
+						Recommendation: "BLOCKED: This could delete all user data. Never delete from home directory with wildcards.",
 					})
+					homeDeleteFound = true
 					break // Only report once
 				}
 			}
+
+			// Check for root deletion patterns (catches rm -rf /, rm -r /*, rm -rf /*, etc.)
+			// Skip if home delete was found to prevent double detection
+			if !homeDeleteFound {
+				rootDeletePatterns := []string{
+					"rm -rf /",      // Original pattern
+					"rm -r /",       // Without force flag
+					"rm -rf / ",     // With trailing space
+					"rm -r / ",      // Without force, with space
+					"rm -rf /*",     // With wildcard
+					"rm -r /*",      // Without force, with wildcard
+					"rm -rf /* ",    // With wildcard and space
+					"rm -r /* ",     // Without force, wildcard, space
+					"rm -rf / *",    // Space between / and *
+					"rm -r / *",     // Without force, space between
+					"rm -rf /bin",   // System directories
+					"rm -rf /usr",   // System directories
+					"rm -rf /etc",   // System directories
+					"rm -rf /var",   // System directories
+					"rm -rf /opt",   // System directories
+					"rm -rf /sbin",  // System directories
+					"rm -rf /lib",   // System directories
+					"rm -rf /lib64", // System directories
+					"rm -rf /sys",   // System directories
+					"rm -rf /proc",  // System directories
+					"rm -rf /dev",   // System directories
+					"rm -rf /boot",  // System directories
+					"rm -rf /root",  // Root home directory
+					"rm -rf /usr/local",
+					"rm -rf /home",  // Entire /home directory (not /home/* which is caught above)
+					"rm -rf /srv",
+					"rm -rf /var/log",
+					"rm -rf /etc/ssh",
+					"rm -rf /system",
+					"rm -rf /library",
+					"rm -rf /applications",
+					"rm -rf /tmp/*",  // Temp directory wildcard deletion
+					"rm -r /tmp/*",   // Temp directory wildcard deletion (without force)
+				}
+
+				for _, pattern := range rootDeletePatterns {
+					if strings.Contains(lower, pattern) {
+						findings = append(findings, Finding{
+							Severity:       "critical",
+							Code:           "DANGEROUS_DELETE_ROOT",
+							Description:    fmt.Sprintf("Recursive delete targeting root or system directory detected: %s", pattern),
+							Line:           lineNum,
+							Recommendation: "BLOCKED: This command would destroy the system. Never delete from root or system directories.",
+						})
+						break // Only report once
+					}
+				}
+			}
+		}
+
+		// Destructive find operations (find / -delete)
+		if strings.Contains(lower, "find /") && strings.Contains(lower, "-delete") {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "DANGEROUS_DELETE_ROOT",
+				Description:    "Destructive find command targeting root directory with -delete",
+				Line:           lineNum,
+				Recommendation: "BLOCKED: This command would destroy the system. Never use find / with -delete.",
+			})
+		}
+		if strings.Contains(lower, "find /") && (strings.Contains(lower, "-type f -delete") || strings.Contains(lower, "-type d -delete")) {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "DANGEROUS_DELETE_ROOT",
+				Description:    "Destructive find command targeting root directory with type-specific delete",
+				Line:           lineNum,
+				Recommendation: "BLOCKED: This command would destroy the system. Never use find / with -delete.",
+			})
 		}
 
 		// Destructive disk operations
 		diskWipeKeywords := []string{
 			"wipefs", "sfdisk", "fdisk", "parted", "sgdisk", "blkdiscard",
 			"pvremove", "vgremove", "lvremove",
+		}
+		// Check for dd if=/dev/zero (disk wiping)
+		if strings.Contains(lower, "dd if=/dev/zero") || strings.Contains(lower, "dd if=/dev/urandom") {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "DISK_WIPE",
+				Description:    "Destructive disk wipe operation detected (dd if=/dev/zero)",
+				Line:           lineNum,
+				Recommendation: "BLOCK this command. It can destroy filesystems or volumes irreversibly.",
+			})
+		}
+		// Check for mkfs (filesystem creation - destructive if targeting mounted drives)
+		if strings.Contains(lower, "mkfs") && (strings.Contains(lower, "/dev/") || strings.Contains(lower, "/dev/sd") || strings.Contains(lower, "/dev/hd")) {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "DISK_WIPE",
+				Description:    "Destructive filesystem creation detected (mkfs)",
+				Line:           lineNum,
+				Recommendation: "BLOCK this command. It can destroy filesystems or volumes irreversibly.",
+			})
 		}
 		if containsAnyWord(lower, diskWipeKeywords) ||
 			(strings.Contains(lower, "cryptsetup") && strings.Contains(lower, "luksformat")) {
