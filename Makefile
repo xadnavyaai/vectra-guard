@@ -57,12 +57,22 @@ test-destructive-quick:
 test-destructive-docker:
 	docker-compose -f docker-compose.test.yml run --rm --no-deps test-destructive
 
-# Extended destructive testing
+# Extended testing (comprehensive)
 test-extended:
-	./scripts/test-extended.sh
+	./scripts/test-extended.sh --local
 
 test-extended-docker:
 	docker-compose -f docker-compose.test.yml run --rm --no-deps test-extended
+
+test-extended-quick:
+	./scripts/test-extended.sh --local --quick
+
+test-extended-full:
+	@echo "Step 1: Testing in Docker (execution verification)..."
+	@make test-extended-docker || (echo "Docker tests failed! Fix issues before local testing." && exit 1)
+	@echo ""
+	@echo "Step 2: Testing locally (detection verification)..."
+	@./scripts/test-extended.sh --local
 
 # Dev mode setup
 dev-mode:

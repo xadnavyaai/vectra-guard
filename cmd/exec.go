@@ -67,6 +67,16 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 	// Filter findings based on guard level
 	filteredFindings := filterFindingsByGuardLevel(findings, cfg.GuardLevel.Level)
 	
+	// Debug: Log if findings were filtered out
+	if len(findings) > 0 && len(filteredFindings) == 0 {
+		logger.Warn("findings filtered out by guard level", map[string]any{
+			"total_findings": len(findings),
+			"filtered_findings": len(filteredFindings),
+			"guard_level": cfg.GuardLevel.Level,
+			"findings": findings,
+		})
+	}
+	
 	if len(filteredFindings) > 0 {
 		// Determine highest risk level
 		for _, f := range filteredFindings {
@@ -343,6 +353,15 @@ func filterFindingsByGuardLevel(findings []analyzer.Finding, level config.GuardL
 			if f.Severity == "critical" || f.Severity == "high" || f.Severity == "medium" {
 				filtered = append(filtered, f)
 			}
+		case config.GuardLevelAuto:
+			// Auto mode: treat as medium for filtering (conservative)
+			if f.Severity == "critical" || f.Severity == "high" {
+				filtered = append(filtered, f)
+			}
+		default:
+			// Unknown guard level - be conservative and include all findings
+			// This handles edge cases where level might not match expected constants
+			filtered = append(filtered, f)
 		}
 	}
 	

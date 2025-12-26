@@ -37,6 +37,20 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 		}
 
 		lower := strings.ToLower(trimmed)
+		
+		// Smart Python command parsing: Extract shell commands from Python code
+		if isPythonCommand(trimmed) {
+			pythonCode := extractPythonCodeFromCommand(trimmed)
+			if pythonCode != "" {
+				extractedCommands := extractPythonCommands(pythonCode)
+				for _, extractedCmd := range extractedCommands {
+					// Recursively analyze extracted commands
+					extractedFindings := analyzeExtractedCommand(extractedCmd, lineNum, policy)
+					findings = append(findings, extractedFindings...)
+				}
+			}
+		}
+		
 		if containsAny(lower, policy.Denylist) {
 			findings = append(findings, Finding{
 				Severity:       "high",
@@ -300,11 +314,37 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				Recommendation: "Remove fork bomb pattern; it can render systems unusable.",
 			})
 		}
-		if (strings.Contains(lower, "socket.socket") && strings.Contains(lower, "dup2") &&
-			(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash"))) ||
-			(strings.Contains(lower, "nc ") && strings.Contains(lower, " -e ") &&
-				(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash"))) ||
-			(strings.Contains(lower, "/dev/tcp/") && strings.Contains(lower, "bash -i")) {
+		// Reverse shell detection - multiple patterns
+		isReverseShell := false
+		
+		// Pattern 1: socket.socket + dup2 + shell
+		if strings.Contains(lower, "socket.socket") && strings.Contains(lower, "dup2") &&
+			(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash")) {
+			isReverseShell = true
+		}
+		
+		// Pattern 2: nc/netcat with -e flag and shell
+		if (strings.Contains(lower, "nc ") || strings.Contains(lower, "netcat ")) && 
+			strings.Contains(lower, " -e ") &&
+			(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash")) {
+			isReverseShell = true
+		}
+		
+		// Pattern 3: bash/dev/tcp reverse shell
+		if strings.Contains(lower, "/dev/tcp/") && strings.Contains(lower, "bash -i") {
+			isReverseShell = true
+		}
+		
+		// Pattern 4: /bin/sh -i or /bin/bash -i (interactive shell, often used in reverse shells)
+		// Especially when combined with subprocess or socket operations
+		if (strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash")) &&
+			strings.Contains(lower, "-i") &&
+			(strings.Contains(lower, "subprocess") || strings.Contains(lower, "socket") || 
+			 strings.Contains(lower, "dup2") || strings.Contains(lower, "connect")) {
+			isReverseShell = true
+		}
+		
+		if isReverseShell {
 			findings = append(findings, Finding{
 				Severity:       "critical",
 				Code:           "REVERSE_SHELL",
@@ -561,6 +601,22 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 	}
 
 	return findings
+}
+
+// analyzeExtractedCommand analyzes a command extracted from Python code
+func analyzeExtractedCommand(cmd string, lineNum int, policy config.PolicyConfig) []Finding {
+	// Create a single-line "script" for analysis
+	content := []byte(cmd)
+	// Use a special path to indicate this is an extracted command
+	extractedFindings := AnalyzeScript("extracted-from-python", content, policy)
+	
+	// Update line numbers to point to the original Python command
+	for i := range extractedFindings {
+		extractedFindings[i].Line = lineNum
+		extractedFindings[i].Description = fmt.Sprintf("Extracted from Python code: %s", extractedFindings[i].Description)
+	}
+	
+	return extractedFindings
 }
 
 func isAllowed(line string, allow []string) bool {

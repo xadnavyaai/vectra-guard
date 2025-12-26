@@ -1,0 +1,93 @@
+# Test Configuration for Extended Tests
+# Comprehensive denylist for testing
+
+guard_level:
+  level: high  # High security for testing
+  allow_user_bypass: false  # No bypasses during testing
+
+sandbox:
+  enabled: true
+  mode: auto
+  runtime: docker
+  image: ubuntu:22.04
+
+policies:
+  monitor_git_ops: true
+  block_force_git: true
+  detect_prod_env: false  # Not needed for testing
+  only_destructive_sql: true
+  
+  # Comprehensive denylist for testing
+  denylist:
+    # File system destruction
+    - "rm -rf /"
+    - "rm -r /*"
+    - "rm -rf /*"
+    - "rm -rf ~/*"
+    - "rm -rf $HOME/*"
+    - "rm -rf /bin"
+    - "rm -rf /usr"
+    - "rm -rf /etc"
+    - "rm -rf /var"
+    - "rm -rf /opt"
+    - "rm -rf /sbin"
+    - "rm -rf /lib"
+    - "rm -rf /sys"
+    - "rm -rf /proc"
+    - "rm -rf /dev"
+    - "rm -rf /boot"
+    - "rm -rf /root"
+    - "find / -type f -delete"
+    - "find / -type d -delete"
+    
+    # Disk operations
+    - "dd if=/dev/zero"
+    - "mkfs"
+    - "format C:"
+    - "del /F /S /Q"
+    
+    # Process/system attacks
+    - ":(){ :|:& };:"  # Fork bomb
+    - "killall -9 init"
+    - "kill -9 1"
+    - "killall -9 systemd"
+    - "systemctl stop systemd"
+    - "service network stop"
+    - "halt"
+    - "shutdown -h now"
+    - "reboot"
+    - "init 0"
+    - "init 6"
+    - "poweroff"
+    - "pkill -9 -f systemd"
+    
+    # Network attacks (only when piped)
+    - "curl * | sh"
+    - "curl * | bash"
+    - "wget * | sh"
+    - "wget * | bash"
+    - "nc -l -p"
+    - "bash -i >& /dev/tcp"
+    
+    # Privilege escalation
+    - "sudo rm"
+    - "sudo dd"
+    - "su - root"
+    - "sudo su -"
+    - "sudo -i"
+    - "sudo bash"
+    
+    # Database operations
+    - "DROP DATABASE"
+    - "TRUNCATE"
+    - "DELETE FROM"
+    - "FLUSHALL"
+    - "FLUSHDB"
+    
+    # Git operations
+    - "git push --force"
+    - "git push -f"
+    - "git filter-repo"
+    - "git reflog expire"
+    - "git update-ref -d"
+
