@@ -139,6 +139,30 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				Recommendation: "Download scripts to disk and review checksum before execution.",
 			})
 		}
+		if (strings.Contains(lower, "curl ") || strings.Contains(lower, "wget ")) &&
+			(strings.Contains(lower, "http://") || strings.Contains(lower, "https://")) {
+			isScriptDownload := strings.Contains(lower, ".sh") ||
+				strings.Contains(lower, ".bash") ||
+				strings.Contains(lower, ".ps1") ||
+				strings.Contains(lower, "install.sh") ||
+				strings.Contains(lower, "script.sh")
+			outputsToStdout := strings.Contains(lower, "-o-") ||
+				strings.Contains(lower, "-o -") ||
+				strings.Contains(lower, "--output -") ||
+				strings.Contains(lower, "-o /dev/stdout") ||
+				strings.Contains(lower, "-o /proc/self/fd/1") ||
+				strings.Contains(lower, "-o /dev/fd/1") ||
+				strings.Contains(lower, "-O-")
+			if isScriptDownload || outputsToStdout {
+				findings = append(findings, Finding{
+					Severity:       "high",
+					Code:           "NETWORK_SCRIPT_DOWNLOAD",
+					Description:    "Remote script download detected",
+					Line:           lineNum,
+					Recommendation: "Download to disk, verify checksum, and review before execution.",
+				})
+			}
+		}
 		if strings.Contains(lower, ":(){ :|:& };:") {
 			findings = append(findings, Finding{
 				Severity:       "critical",
@@ -146,6 +170,19 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				Description:    "Potential fork bomb detected",
 				Line:           lineNum,
 				Recommendation: "Remove fork bomb pattern; it can render systems unusable.",
+			})
+		}
+		if (strings.Contains(lower, "socket.socket") && strings.Contains(lower, "dup2") &&
+			(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash"))) ||
+			(strings.Contains(lower, "nc ") && strings.Contains(lower, " -e ") &&
+				(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash"))) ||
+			(strings.Contains(lower, "/dev/tcp/") && strings.Contains(lower, "bash -i")) {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "REVERSE_SHELL",
+				Description:    "Reverse shell pattern detected",
+				Line:           lineNum,
+				Recommendation: "BLOCK this command. Reverse shells allow remote code execution.",
 			})
 		}
 		if strings.Contains(lower, ">/etc/passwd") || strings.Contains(lower, ">/etc/shadow") {
@@ -222,6 +259,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 			// Check for destructive SQL operations
 			destructiveSQLOps := []string{
 				"drop database", "drop table", "drop schema", "drop index",
+				"dropdatabase", "db.dropdatabase", "db.dropdatabase()",
 				"truncate table", "truncate",
 				"delete from", "delete ",
 				"update ", "alter table", "alter database",

