@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vectra-guard/vectra-guard/internal/analyzer"
 	"github.com/vectra-guard/vectra-guard/internal/config"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 )
@@ -110,19 +111,61 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 		SecurityLevel: string(sandboxCfg.SecurityLevel),
 	}
 	
-	// Rule 1: Check if sandboxing is disabled
+	// Rule 1: MANDATORY SANDBOXING for critical commands (cannot be bypassed)
+	// Check for critical risk commands that MUST run in sandbox regardless of trust or config
+	if riskLevel == "critical" {
+		// Extract findings to check for specific critical codes
+		var findingsList []analyzer.Finding
+		if findings, ok := findings.([]analyzer.Finding); ok {
+			findingsList = findings
+		}
+		
+		// Critical codes that require mandatory sandboxing (cannot bypass)
+		mandatorySandboxCodes := []string{
+			"DANGEROUS_DELETE_ROOT",
+			"DANGEROUS_DELETE_HOME",
+			"FORK_BOMB",
+			"SENSITIVE_ENV_ACCESS",
+			"DOTENV_FILE_READ",
+		}
+		
+		hasMandatoryCode := false
+		for _, finding := range findingsList {
+			for _, code := range mandatorySandboxCodes {
+				if finding.Code == code {
+					hasMandatoryCode = true
+					break
+				}
+			}
+			if hasMandatoryCode {
+				break
+			}
+		}
+		
+		if hasMandatoryCode {
+			// MANDATORY: These commands MUST run in sandbox, cannot bypass
+			decision.Mode = ExecutionModeSandbox
+			decision.Reason = "CRITICAL: Mandatory sandbox required for system-destructive command"
+			decision.ShouldCache = e.shouldEnableCache(cmdArgs)
+			decision.CacheKey = e.generateCacheKey(cmdArgs)
+			return decision
+		}
+	}
+	
+	// Rule 2: Check if sandboxing is disabled (but not for critical commands above)
 	if !sandboxCfg.Enabled {
 		decision.Reason = "sandboxing disabled in config"
 		return decision
 	}
 	
-	// Rule 2: Check trust store - if approved and remembered, run on host
+	// Rule 3: Check trust store - if approved and remembered, run on host
+	// NOTE: Trust store bypass does NOT apply to critical commands (handled above)
 	if e.trust.IsTrusted(cmdString) {
 		decision.Reason = "command previously approved and trusted"
 		return decision
 	}
 	
-	// Rule 3: Check mode-specific behavior first
+	// Rule 4: Check mode-specific behavior first
 	if sandboxCfg.Mode == config.SandboxModeAlways {
 		// Always mode sandboxes everything
 		decision.Mode = ExecutionModeSandbox
@@ -133,21 +176,22 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 	}
 	
 	if sandboxCfg.Mode == config.SandboxModeNever {
-		// Never mode never sandboxes
+		// Never mode never sandboxes (but critical commands already handled above)
 		decision.Reason = "sandboxing disabled by mode"
 		return decision
 	}
 	
-	// Rule 4: Check allowlist patterns first - they take precedence
-	if e.matchesAllowlist(cmdString) {
+	// Rule 5: Check allowlist patterns - but NOT for critical commands
+	// Allowlist does NOT bypass mandatory sandboxing for critical operations
+	if riskLevel != "critical" && e.matchesAllowlist(cmdString) {
 		decision.Reason = "matches allowlist pattern"
 		return decision
 	}
 	
-	// Rule 5: Check for networked installs (before low-risk check)
+	// Rule 6: Check for networked installs (before low-risk check)
 	isNetworkedInstall := e.isNetworkedInstall(cmdString)
 	
-	// Rule 6: Determine if command should run in sandbox based on risk and policy
+	// Rule 7: Determine if command should run in sandbox based on risk and policy
 	shouldSandbox := false
 	reason := ""
 	

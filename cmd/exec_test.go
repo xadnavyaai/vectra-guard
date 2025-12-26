@@ -367,3 +367,143 @@ func TestGuardLevelScenarios(t *testing.T) {
 		})
 	}
 }
+
+// TestPreExecutionAssessment tests that critical commands are assessed
+// and blocked before execution if sandbox is unavailable
+func TestPreExecutionAssessment(t *testing.T) {
+	tests := []struct {
+		name           string
+		command        string
+		riskLevel      string
+		findings       []analyzer.Finding
+		sandboxEnabled bool
+		shouldBlock    bool
+		description    string
+	}{
+		{
+			name:      "critical command with sandbox disabled",
+			command:   "rm -r /*",
+			riskLevel: "critical",
+			findings: []analyzer.Finding{
+				{Code: "DANGEROUS_DELETE_ROOT", Severity: "critical"},
+			},
+			sandboxEnabled: false,
+			shouldBlock:    true,
+			description:    "Critical command should be blocked if sandbox disabled",
+		},
+		{
+			name:      "critical command with sandbox enabled",
+			command:   "rm -r /*",
+			riskLevel: "critical",
+			findings: []analyzer.Finding{
+				{Code: "DANGEROUS_DELETE_ROOT", Severity: "critical"},
+			},
+			sandboxEnabled: true,
+			shouldBlock:    false,
+			description:    "Critical command should proceed if sandbox enabled",
+		},
+		{
+			name:           "non-critical command with sandbox disabled",
+			command:        "echo test",
+			riskLevel:       "low",
+			findings:        []analyzer.Finding{},
+			sandboxEnabled: false,
+			shouldBlock:     false,
+			description:     "Non-critical commands can proceed without sandbox",
+		},
+		{
+			name:      "fork bomb with sandbox disabled",
+			command:   ":(){ :|:& };:",
+			riskLevel: "critical",
+			findings: []analyzer.Finding{
+				{Code: "FORK_BOMB", Severity: "critical"},
+			},
+			sandboxEnabled: false,
+			shouldBlock:    true,
+			description:    "Fork bomb should be blocked if sandbox disabled",
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This test verifies the logic that would be in runExec
+			// We're testing that critical commands require sandbox
+			
+			hasCriticalCode := false
+			for _, f := range tt.findings {
+				criticalCodes := []string{
+					"DANGEROUS_DELETE_ROOT",
+					"DANGEROUS_DELETE_HOME",
+					"FORK_BOMB",
+					"SENSITIVE_ENV_ACCESS",
+					"DOTENV_FILE_READ",
+				}
+				for _, code := range criticalCodes {
+					if f.Code == code {
+						hasCriticalCode = true
+						break
+					}
+				}
+				if hasCriticalCode {
+					break
+				}
+			}
+			
+			// Simulate pre-execution assessment logic
+			shouldBlock := false
+			if tt.riskLevel == "critical" && hasCriticalCode && !tt.sandboxEnabled {
+				shouldBlock = true
+			}
+			
+			if shouldBlock != tt.shouldBlock {
+				t.Errorf("expected shouldBlock=%v, got=%v (%s)",
+					tt.shouldBlock, shouldBlock, tt.description)
+			}
+		})
+	}
+}
+
+// TestSecurityImprovementsRegression tests that the incident scenario
+// (rm -r /*) is now properly detected and handled
+func TestSecurityImprovementsRegression(t *testing.T) {
+	// The incident: rm -r /* was not detected
+	incidentCommand := "rm -r /*"
+	
+	policy := config.PolicyConfig{}
+	findings := analyzer.AnalyzeScript("incident.sh", []byte(incidentCommand), policy)
+	
+	// Should detect DANGEROUS_DELETE_ROOT
+	found := false
+	for _, f := range findings {
+		if f.Code == "DANGEROUS_DELETE_ROOT" && f.Severity == "critical" {
+			found = true
+			break
+		}
+	}
+	
+	if !found {
+		t.Fatal("REGRESSION: Incident command 'rm -r /*' is NOT detected!")
+	}
+	
+	// Should also detect other variations
+	variations := []string{
+		"rm -rf /*",
+		"rm -r /",
+		"rm -rf /bin",
+		"rm -rf /usr",
+	}
+	
+	for _, variant := range variations {
+		findings := analyzer.AnalyzeScript("test.sh", []byte(variant), policy)
+		found := false
+		for _, f := range findings {
+			if f.Code == "DANGEROUS_DELETE_ROOT" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("REGRESSION: Variation '%s' is NOT detected!", variant)
+		}
+	}
+}

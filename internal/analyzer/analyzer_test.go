@@ -521,3 +521,219 @@ func TestEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestEnhancedDestructiveCommandDetection tests the improved pattern detection
+// that catches all variations of destructive rm commands (the incident scenario)
+func TestEnhancedDestructiveCommandDetection(t *testing.T) {
+	tests := []struct {
+		name           string
+		script         string
+		shouldDetect   bool
+		expectedCode   string
+		expectedSeverity string
+	}{
+		// Original pattern (already tested, but included for completeness)
+		{
+			name:           "rm -rf / (original)",
+			script:         "rm -rf /",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		// The incident scenario - this is what we're fixing
+		{
+			name:           "rm -r /* (incident scenario)",
+			script:         "rm -r /*",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /* (with wildcard)",
+			script:         "rm -rf /*",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -r / (without force)",
+			script:         "rm -r /",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf / (with trailing space)",
+			script:         "rm -rf / ",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -r / * (space between)",
+			script:         "rm -r / *",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		// System directory targets
+		{
+			name:           "rm -rf /bin",
+			script:         "rm -rf /bin",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /usr",
+			script:         "rm -rf /usr",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /etc",
+			script:         "rm -rf /etc",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /var",
+			script:         "rm -rf /var",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /opt",
+			script:         "rm -rf /opt",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /sbin",
+			script:         "rm -rf /sbin",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /lib",
+			script:         "rm -rf /lib",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:           "rm -rf /root",
+			script:         "rm -rf /root",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		// Safe operations (should not trigger)
+		{
+			name:           "rm -rf ./tmp (safe - relative path)",
+			script:         "rm -rf ./tmp",
+			shouldDetect:   false,
+			expectedCode:   "",
+			expectedSeverity: "",
+		},
+		{
+			name:           "rm -rf /tmp/test (safe - specific subdirectory)",
+			script:         "rm -rf /tmp/test",
+			shouldDetect:   false,
+			expectedCode:   "",
+			expectedSeverity: "",
+		},
+		{
+			name:           "rm file.txt (safe - single file)",
+			script:         "rm file.txt",
+			shouldDetect:   false,
+			expectedCode:   "",
+			expectedSeverity: "",
+		},
+	}
+	
+	policy := config.PolicyConfig{}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
+			
+			found := false
+			for _, f := range findings {
+				if f.Code == tt.expectedCode {
+					found = true
+					if f.Severity != tt.expectedSeverity {
+						t.Errorf("expected severity %s, got %s", tt.expectedSeverity, f.Severity)
+					}
+					break
+				}
+			}
+			
+			if found != tt.shouldDetect {
+				t.Errorf("expected detection=%v, got=%v for script: %s", 
+					tt.shouldDetect, found, tt.script)
+			}
+		})
+	}
+}
+
+// TestHomeDirectoryDeletionDetection tests detection of dangerous home directory operations
+func TestHomeDirectoryDeletionDetection(t *testing.T) {
+	tests := []struct {
+		name           string
+		script         string
+		shouldDetect   bool
+		expectedCode   string
+	}{
+		{
+			name:           "rm -rf ~/* (home wildcard)",
+			script:         "rm -rf ~/*",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_HOME",
+		},
+		{
+			name:           "rm -r ~/* (home wildcard without force)",
+			script:         "rm -r ~/*",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_HOME",
+		},
+		{
+			name:           "rm -rf $HOME/* (home env var)",
+			script:         "rm -rf $HOME/*",
+			shouldDetect:   true,
+			expectedCode:   "DANGEROUS_DELETE_HOME",
+		},
+		{
+			name:           "rm -rf ~/specific_dir (safe - specific directory)",
+			script:         "rm -rf ~/specific_dir",
+			shouldDetect:   false,
+			expectedCode:   "",
+		},
+	}
+	
+	policy := config.PolicyConfig{}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
+			
+			found := false
+			for _, f := range findings {
+				if f.Code == tt.expectedCode {
+					found = true
+					break
+				}
+			}
+			
+			if found != tt.shouldDetect {
+				t.Errorf("expected detection=%v, got=%v for script: %s", 
+					tt.shouldDetect, found, tt.script)
+			}
+		})
+	}
+}

@@ -1,0 +1,103 @@
+# Vectra Guard - Secure Development Configuration
+# 
+# This configuration provides a good balance between security and productivity
+# for development environments. It prevents catastrophic mistakes while allowing
+# developers to work efficiently.
+#
+# Key Features:
+# - Blocks critical and high-risk commands
+# - Auto-sandboxes medium+ risk commands
+# - Allows user bypass for emergencies
+# - Enables caching for performance
+# - Monitors git operations
+
+guard_level:
+  level: medium  # Blocks critical + high severity
+  allow_user_bypass: true  # Developers can bypass with proper auth
+  bypass_env_var: VECTRAGUARD_BYPASS
+  require_approval_above: medium
+
+policies:
+  # Git Operations
+  monitor_git_ops: true
+  block_force_git: false  # Allow in dev (but warn)
+  
+  # Production Environment Detection
+  detect_prod_env: false  # Not needed in dev
+  
+  # SQL Detection
+  only_destructive_sql: true  # Only flag destructive operations
+  
+  # Commands always allowed (safe operations)
+  allowlist:
+    - "echo *"
+    - "ls *"
+    - "cat *"
+    - "pwd"
+    - "git status"
+    - "git diff"
+    - "git log"
+    - "git branch"
+    - "npm install"
+    - "npm test"
+    - "npm run build"
+    - "yarn install"
+    - "yarn test"
+    - "docker-compose up"
+    - "docker-compose down"
+  
+  # Commands blocked or requiring approval
+  denylist:
+    - "rm -rf /"
+    - "rm -r /*"
+    - "rm -rf /*"
+    - "sudo rm"
+    - "sudo dd"
+    - ":(){ :|:& };:"  # fork bomb
+    - "curl * | sh"
+    - "wget * | bash"
+    - "DROP DATABASE"
+    - "TRUNCATE"
+
+# Environment Variable Protection
+env_protection:
+  enabled: true
+  masking_mode: partial  # Partial masking for dev
+  block_dotenv_read: true
+
+# Sandbox Configuration
+sandbox:
+  enabled: true
+  mode: auto  # Auto-sandbox medium+ risk commands
+  security_level: balanced  # Good balance of security and usability
+  
+  # Runtime
+  runtime: docker  # docker, podman, or process
+  image: ubuntu:22.04
+  timeout: 300  # 5 minutes
+  
+  # Network
+  network_mode: restricted  # Allow network but restrict egress
+  
+  # Caching
+  enable_cache: true  # Enable dependency caching
+  
+  # Environment variables to pass through
+  env_whitelist:
+    - HOME
+    - USER
+    - PATH
+    - SHELL
+    - TERM
+    - LANG
+    - LC_ALL
+    - PWD
+    - OLDPWD
+    - NODE_ENV
+    - NPM_TOKEN
+    - GITHUB_TOKEN
+  
+  # Observability
+  enable_metrics: true
+  log_output: false
+

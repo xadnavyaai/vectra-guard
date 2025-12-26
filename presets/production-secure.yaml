@@ -1,0 +1,116 @@
+# Vectra Guard - Secure Production Configuration
+#
+# This configuration provides MAXIMUM protection for production environments.
+# It enforces strict security policies with zero tolerance for bypasses.
+#
+# Key Features:
+# - Paranoid guard level (everything requires approval)
+# - NO bypasses allowed
+# - ALWAYS sandbox (even safe commands)
+# - Maximum isolation (no network, read-only root)
+# - Comprehensive audit logging
+#
+# WARNING: This configuration is very restrictive. Test thoroughly in staging first.
+
+guard_level:
+  level: paranoid  # Everything requires approval
+  allow_user_bypass: false  # NO bypasses in production
+  require_approval_above: low  # Even low-risk needs approval
+
+policies:
+  # Git Operations
+  monitor_git_ops: true
+  block_force_git: true  # BLOCK force push in prod
+  
+  # Production Environment Detection
+  detect_prod_env: true
+  prod_env_patterns:
+    - prod
+    - production
+    - prd
+    - live
+    - staging
+    - stg
+    - uat
+  
+  # SQL Detection
+  only_destructive_sql: true
+  
+  # Minimal allowlist - only read-only operations
+  allowlist:
+    - "git status"
+    - "git diff"
+    - "git log"
+    - "git show"
+    - "ls *"
+    - "cat *"
+    - "pwd"
+    - "echo *"
+  
+  # Comprehensive denylist
+  denylist:
+    - "rm *"
+    - "sudo *"
+    - "dd if="
+    - "mkfs"
+    - "fdisk"
+    - "parted"
+    - "git push --force"
+    - "git push -f"
+    - "DROP DATABASE"
+    - "DROP TABLE"
+    - "TRUNCATE"
+    - "DELETE FROM"
+    - "curl * | sh"
+    - "wget * | bash"
+    - ":(){ :|:& };:"  # fork bomb
+    - "rm -rf"
+    - "rm -r"
+
+# Environment Variable Protection
+env_protection:
+  enabled: true
+  masking_mode: full  # Full masking in production
+  block_dotenv_read: true
+  block_env_access: true  # Block env access attempts
+
+# Sandbox Configuration
+sandbox:
+  enabled: true
+  mode: always  # ALWAYS sandbox in production
+  security_level: paranoid  # Maximum isolation
+  
+  # Runtime
+  runtime: docker  # docker, podman, or process
+  image: ubuntu:22.04
+  timeout: 600  # 10 minutes (longer for production operations)
+  
+  # Network
+  network_mode: none  # NO network access in production
+  
+  # Security
+  read_only_root: true  # Read-only filesystem
+  seccomp_profile: seccomp-profile.json  # Strict syscall filtering
+  
+  # Resource Limits
+  memory_limit: 512m
+  cpu_limit: 0.5
+  pids_limit: 50
+  
+  # Caching (disabled for security)
+  enable_cache: false
+  
+  # Minimal environment variables
+  env_whitelist:
+    - HOME
+    - USER
+    - PATH
+    - TERM
+    - LANG
+    - LC_ALL
+    - PWD
+  
+  # Observability
+  enable_metrics: true
+  log_output: true  # Log all output in production
+

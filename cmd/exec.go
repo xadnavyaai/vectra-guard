@@ -141,17 +141,70 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 	}
 
+	// PRE-EXECUTION PERMISSION ASSESSMENT
+	// For critical commands, enforce mandatory sandboxing BEFORE any execution
+	if riskLevel == "critical" {
+		criticalCodes := []string{
+			"DANGEROUS_DELETE_ROOT",
+			"DANGEROUS_DELETE_HOME",
+			"FORK_BOMB",
+			"SENSITIVE_ENV_ACCESS",
+			"DOTENV_FILE_READ",
+		}
+		
+		hasCriticalCode := false
+		for _, f := range filteredFindings {
+			for _, code := range criticalCodes {
+				if f.Code == code {
+					hasCriticalCode = true
+					break
+				}
+			}
+			if hasCriticalCode {
+				break
+			}
+		}
+		
+		if hasCriticalCode {
+			// CRITICAL: These commands MUST be sandboxed - no bypass allowed
+			logger.Error("CRITICAL command detected - mandatory sandbox required", map[string]any{
+				"command":    cmdString,
+				"risk_level": riskLevel,
+				"findings":   findingCodes,
+			})
+			
+			// Even if sandbox is disabled, we MUST enforce it for critical commands
+			// This is a safety override that cannot be bypassed
+			if !cfg.Sandbox.Enabled {
+				return &exitError{
+					message: fmt.Sprintf("CRITICAL: Command '%s' requires sandboxing but sandbox is disabled. Enable sandbox in config to proceed.", cmdString),
+					code:    3,
+				}
+			}
+		}
+	}
+	
 	// Create sandbox executor
 	executor, err := sandbox.NewExecutor(cfg, logger)
 	if err != nil {
 		logger.Error("failed to initialize sandbox executor", map[string]any{
 			"error": err.Error(),
 		})
-		// Fallback to direct execution if sandbox init fails
+		
+		// For critical commands, we cannot fallback to direct execution
+		if riskLevel == "critical" {
+			return &exitError{
+				message: fmt.Sprintf("CRITICAL: Cannot execute critical command without sandbox. Sandbox initialization failed: %v", err),
+				code:    3,
+			}
+		}
+		
+		// Fallback to direct execution only for non-critical commands
 		return executeCommandDirectly(cmdArgs)
 	}
 	
 	// Decide execution mode (host vs sandbox)
+	// Pass findings so sandbox can make informed decisions
 	decision := executor.DecideExecutionMode(ctx, cmdArgs, riskLevel, filteredFindings)
 	
 	// Show user-friendly notice

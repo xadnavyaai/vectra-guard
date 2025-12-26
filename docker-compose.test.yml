@@ -1,0 +1,87 @@
+# Docker Compose configuration for testing Vectra Guard
+# Note: version field removed (obsolete in newer docker-compose)
+# Provides isolated test environment with Docker-in-Docker support
+
+services:
+  # Test runner service
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test
+    volumes:
+      # Mount source code
+      - .:/workspace:rw
+      # Docker socket for Docker-in-Docker (sandbox testing)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Go module cache (for faster builds)
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - VECTRA_GUARD_VERSION=test
+    working_dir: /workspace
+    # Run as root for Docker socket access (required for Docker-in-Docker)
+    # In production, you'd use a docker group, but for testing root is simpler
+    user: "0:0"
+    # Default: run all tests
+    # Entrypoint and command can be overridden when running
+    entrypoint: []
+    command: ["make", "test"]
+    networks:
+      - test-network
+
+  # Destructive test service - runs comprehensive attack vector tests
+  # All tests run in sandboxed containers for safety
+  test-destructive:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-destructive
+    volumes:
+      - .:/workspace:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - VECTRA_GUARD_VERSION=test
+    privileged: true  # Required for Docker-in-Docker (sandbox testing)
+    working_dir: /workspace
+    entrypoint: []
+    command: ["./scripts/test-destructive.sh"]
+    networks:
+      - test-network
+
+  # Optional: Test with Docker daemon
+  # Note: Docker will automatically build for the host architecture (ARM64 or x86_64)
+  test-with-docker:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-docker
+    volumes:
+      - .:/workspace:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    privileged: true  # Required for Docker-in-Docker
+    working_dir: /workspace
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["make test"]
+    networks:
+      - test-network
+
+volumes:
+  go-mod-cache:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge
+

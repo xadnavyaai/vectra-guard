@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/vectra-guard/vectra-guard/internal/analyzer"
 	"github.com/vectra-guard/vectra-guard/internal/config"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 )
@@ -471,5 +472,168 @@ func BenchmarkBuildDockerArgs(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		executor.buildDockerArgs(sandboxCfg, cmdArgs)
 	}
+}
+
+// TestMandatorySandboxingForCriticalCommands tests that critical commands
+// cannot be bypassed by trust store, allowlist, or configuration
+func TestMandatorySandboxingForCriticalCommands(t *testing.T) {
+	logger := logging.NewLogger("text", os.Stderr)
+	
+	criticalFindings := []analyzer.Finding{
+		{
+			Code:     "DANGEROUS_DELETE_ROOT",
+			Severity: "critical",
+		},
+	}
+	
+	tests := []struct {
+		name           string
+		config         config.Config
+		cmdArgs        []string
+		riskLevel      string
+		findings       []analyzer.Finding
+		expectedMode   ExecutionMode
+		expectedReason string
+		description    string
+	}{
+		{
+			name: "critical command with trust store bypass attempt",
+			config: config.Config{
+				Policies: config.PolicyConfig{
+					Allowlist: []string{"rm"}, // Even in allowlist
+				},
+				Sandbox: config.SandboxConfig{
+					Enabled:       true,
+					Mode:          config.SandboxModeAuto,
+					SecurityLevel: config.SandboxSecurityBalanced,
+				},
+			},
+			cmdArgs:        []string{"rm", "-r", "/*"},
+			riskLevel:      "critical",
+			findings:       criticalFindings,
+			expectedMode:   ExecutionModeSandbox,
+			expectedReason: "CRITICAL: Mandatory sandbox required for system-destructive command",
+			description:    "Critical command should sandbox even if in allowlist",
+		},
+		{
+			name: "critical command with never mode attempt",
+			config: config.Config{
+				Sandbox: config.SandboxConfig{
+					Enabled:       true,
+					Mode:          config.SandboxModeNever, // Even with never mode
+					SecurityLevel: config.SandboxSecurityBalanced,
+				},
+			},
+			cmdArgs:        []string{"rm", "-r", "/*"},
+			riskLevel:      "critical",
+			findings:       criticalFindings,
+			expectedMode:   ExecutionModeSandbox,
+			expectedReason: "CRITICAL: Mandatory sandbox required for system-destructive command",
+			description:    "Critical command should sandbox even with never mode",
+		},
+		{
+			name: "critical command with sandbox disabled",
+			config: config.Config{
+				Sandbox: config.SandboxConfig{
+					Enabled:       false, // Sandbox disabled
+					Mode:          config.SandboxModeAuto,
+					SecurityLevel: config.SandboxSecurityBalanced,
+				},
+			},
+			cmdArgs:        []string{"rm", "-r", "/*"},
+			riskLevel:      "critical",
+			findings:       criticalFindings,
+			expectedMode:   ExecutionModeSandbox, // Still should try to sandbox
+			expectedReason: "CRITICAL: Mandatory sandbox required for system-destructive command",
+			description:    "Critical command should attempt sandbox even if disabled (will fail later)",
+		},
+		{
+			name: "non-critical command can use allowlist",
+			config: config.Config{
+				Policies: config.PolicyConfig{
+					Allowlist: []string{"echo"},
+				},
+				Sandbox: config.SandboxConfig{
+					Enabled:       true,
+					Mode:          config.SandboxModeAuto,
+					SecurityLevel: config.SandboxSecurityBalanced,
+				},
+			},
+			cmdArgs:        []string{"echo", "test"},
+			riskLevel:      "low",
+			findings:       []analyzer.Finding{},
+			expectedMode:   ExecutionModeHost,
+			expectedReason: "matches allowlist pattern",
+			description:    "Non-critical commands can still use allowlist",
+		},
+		{
+			name: "critical fork bomb detection",
+			config: config.Config{
+				Sandbox: config.SandboxConfig{
+					Enabled:       true,
+					Mode:          config.SandboxModeAuto,
+					SecurityLevel: config.SandboxSecurityBalanced,
+				},
+			},
+			cmdArgs: []string{":(){", ":|:&", "};:"},
+			riskLevel: "critical",
+			findings: []analyzer.Finding{
+				{
+					Code:     "FORK_BOMB",
+					Severity: "critical",
+				},
+			},
+			expectedMode:   ExecutionModeSandbox,
+			expectedReason: "CRITICAL: Mandatory sandbox required for system-destructive command",
+			description:    "Fork bomb should be mandatory sandboxed",
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			executor, err := NewExecutor(tt.config, logger)
+			if err != nil {
+				t.Fatalf("NewExecutor() error = %v", err)
+			}
+			
+			// Add to trust store to test bypass attempt
+			if tt.name == "critical command with trust store bypass attempt" {
+				cmdString := "rm -r /*"
+				_ = executor.trust.Add(cmdString, 0, "test")
+			}
+			
+			decision := executor.DecideExecutionMode(
+				context.Background(),
+				tt.cmdArgs,
+				tt.riskLevel,
+				tt.findings,
+			)
+			
+			if decision.Mode != tt.expectedMode {
+				t.Errorf("DecideExecutionMode() mode = %v, want %v (%s)",
+					decision.Mode, tt.expectedMode, tt.description)
+			}
+			
+			if tt.expectedReason != "" && !containsSubstring(decision.Reason, tt.expectedReason) {
+				t.Errorf("DecideExecutionMode() reason = %v, want to contain %v (%s)",
+					decision.Reason, tt.expectedReason, tt.description)
+			}
+		})
+	}
+}
+
+// containsSubstring checks if a string contains a substring
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || 
+		(len(s) > len(substr) && findSubstringInString(s, substr)))
+}
+
+func findSubstringInString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 

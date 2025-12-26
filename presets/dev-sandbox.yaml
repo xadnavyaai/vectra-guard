@@ -1,0 +1,103 @@
+# Vectra Guard - Sandbox-Based Development Mode
+# 
+# Easy-to-use configuration for developers who want sandbox protection
+# without friction. All risky commands automatically run in isolated containers.
+#
+# Quick Setup:
+#   cp presets/dev-sandbox.yaml vectra-guard.yaml
+#   # or
+#   ./scripts/dev-mode.sh
+#
+# Features:
+# - Auto-sandboxes medium+ risk commands
+# - Fast caching enabled (10x speedup after first run)
+# - Permissive network access for dev tools
+# - Minimal friction for common dev commands
+# - Full protection against destructive operations
+
+guard_level:
+  level: medium  # Blocks critical + high, allows medium with sandbox
+  allow_user_bypass: true  # Emergency bypass available
+
+sandbox:
+  enabled: true
+  mode: auto  # Smart: auto-sandbox medium+ risk commands
+  security_level: permissive  # Fast, minimal isolation for dev speed
+  runtime: docker  # Uses Docker for isolation
+  image: ubuntu:22.04  # Lightweight base image
+  
+  # Performance optimizations
+  enable_cache: true  # 10x speedup for repeated commands
+  timeout: 600  # 10 minutes for long builds
+  
+  # Network access (needed for npm, pip, etc.)
+  network_mode: full  # Full network access in dev
+  
+  # Environment variables to pass through
+  env_whitelist:
+    - HOME
+    - USER
+    - PATH
+    - SHELL
+    - TERM
+    - LANG
+    - LC_ALL
+    - PWD
+    - OLDPWD
+    - NODE_ENV
+    - NPM_TOKEN
+    - GITHUB_TOKEN
+    - DOCKER_HOST
+    - CI
+    - TRAVIS
+    - CIRCLE
+    - JENKINS
+  
+  # Observability
+  enable_metrics: true  # Track time saved by caching
+  log_output: false  # Don't log command output (reduce noise)
+
+policies:
+  # Git operations
+  monitor_git_ops: true
+  block_force_git: false  # Allow in dev (but still warn)
+  
+  # Production detection (not needed in dev)
+  detect_prod_env: false
+  
+  # SQL detection
+  only_destructive_sql: true  # Only flag destructive DB operations
+  
+  # Safe commands that can run on host (no sandbox needed)
+  allowlist:
+    - "echo *"
+    - "ls *"
+    - "cat *"
+    - "pwd"
+    - "git status"
+    - "git diff"
+    - "git log"
+    - "git branch"
+    - "git show"
+    - "git stash"
+    - "cd *"
+    - "which *"
+    - "type *"
+    - "command -v *"
+  
+  # Always blocked (even in dev)
+  denylist:
+    - "rm -rf /"
+    - "rm -r /*"
+    - "rm -rf /*"
+    - "sudo rm -rf /"
+    - "dd if=/dev/zero of=/dev/sda"
+    - ":(){ :|:& };:"  # fork bomb
+
+logging:
+  format: text  # Human-readable for development
+  level: info  # Info level for dev (not too verbose)
+
+env_protection:
+  enabled: false  # Don't block env access in dev (too noisy)
+

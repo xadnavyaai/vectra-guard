@@ -11,6 +11,10 @@ import (
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 )
 
+// Version is set at build time using -ldflags
+// Example: go build -ldflags "-X github.com/vectra-guard/vectra-guard/cmd.Version=v0.0.2"
+var Version = "dev" // Default version for development builds
+
 // Execute parses arguments and runs the requested subcommand.
 func Execute() {
 	if err := execute(os.Args[1:]); err != nil {
@@ -173,9 +177,20 @@ func execute(args []string) error {
 		default:
 			return usageError()
 		}
+	case "version":
+		return runVersion(ctx, *outputFormat)
 	default:
 		return usageError()
 	}
+}
+
+func runVersion(ctx context.Context, outputFormat string) error {
+	if outputFormat == "json" {
+		fmt.Printf(`{"version":"%s","name":"vectra-guard"}`+"\n", Version)
+	} else {
+		fmt.Printf("vectra-guard version %s\n", Version)
+	}
+	return nil
 }
 
 func usageError() error {
@@ -198,6 +213,7 @@ Commands:
   trust clean                  Clean expired entries
   metrics show [--json]        Show sandbox metrics
   metrics reset                Reset metrics
+  version                      Show version information
 `, name)
 	return fmt.Errorf("%s", usage)
 }

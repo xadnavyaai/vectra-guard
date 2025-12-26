@@ -39,7 +39,7 @@ for platform in "${PLATFORMS[@]}"; do
     fi
     
     echo "📦 Building $GOOS/$GOARCH..."
-    GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -o "$OUTPUT" main.go
+    GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w -X github.com/vectra-guard/vectra-guard/cmd.Version=$VERSION" -o "$OUTPUT" main.go
     
     # Calculate checksum
     if command -v shasum &> /dev/null; then

@@ -1735,13 +1735,23 @@ For security issues, please email the maintainers directly rather than opening p
 
 ## 📚 Additional Resources
 
+### Core Documentation
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Step-by-step walkthrough for new users
 - **[CONFIGURATION.md](CONFIGURATION.md)** - Detailed configuration guide with presets
-- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Step-by-step walkthrough
-- **[Project.md](Project.md)** - Original project vision and architecture
-- **[roadmap.md](roadmap.md)** - Detailed development roadmap and milestones
-- **[GO_PRACTICES.md](GO_PRACTICES.md)** - Go coding standards and best practices
-- **[Dockerfile](Dockerfile)** - Container image definition
-- **[docker-compose.yml](docker-compose.yml)** - Optional container setup
+- **[ADVANCED_FEATURES.md](ADVANCED_FEATURES.md)** - Advanced features and capabilities
+- **[SANDBOX.md](SANDBOX.md)** - Sandbox execution system documentation
+- **[CACHING_EXPLAINED.md](CACHING_EXPLAINED.md)** - Sandbox caching system details
+
+### Security & Testing
+- **[SECURITY_MODEL.md](SECURITY_MODEL.md)** - Security model for dev and prod environments
+- **[SECURITY_IMPROVEMENTS.md](SECURITY_IMPROVEMENTS.md)** - Security enhancements and fixes
+- **[SECURITY_TESTING.md](SECURITY_TESTING.md)** - Security testing guide (includes local testing)
+- **[DOCKER_TESTING.md](DOCKER_TESTING.md)** - Dockerized testing guide (includes architecture support)
+- **[TEST_COVERAGE_SUMMARY.md](TEST_COVERAGE_SUMMARY.md)** - Test coverage summary
+
+### Release Notes
+- **[RELEASE_NOTES_v0.0.2.md](RELEASE_NOTES_v0.0.2.md)** - Latest release notes
+- **[RELEASE_NOTES_v0.0.1.md](RELEASE_NOTES_v0.0.1.md)** - Initial release notes
 
 ---
 
@@ -1778,7 +1788,9 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 | **View metrics** | `vg metrics show` |
 | **Sandbox documentation** | See [SANDBOX.md](SANDBOX.md) |
 | **Config examples** | See [CONFIGURATION.md](CONFIGURATION.md) |
-| **Run tests** | `go test ./...` |
+| **Security testing** | See [SECURITY_TESTING.md](SECURITY_TESTING.md) |
+| **Docker testing** | See [DOCKER_TESTING.md](DOCKER_TESTING.md) |
+| **Run tests** | `go test ./...` or `./scripts/test-docker.sh` |
 
 ---
 

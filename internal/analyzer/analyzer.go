@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"bufio"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -47,14 +48,78 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 			continue
 		}
 
-		if strings.Contains(lower, "rm -rf /") {
-			findings = append(findings, Finding{
-				Severity:       "critical",
-				Code:           "DANGEROUS_DELETE_ROOT",
-				Description:    "Recursive delete from filesystem root detected",
-				Line:           lineNum,
-				Recommendation: "Limit delete scope to a safe path and avoid operating on '/'.",
-			})
+		// Enhanced destructive file operations detection
+		// Check for ANY rm command targeting root or system directories
+		if strings.Contains(lower, "rm ") {
+			// Check for root deletion patterns (catches rm -rf /, rm -r /*, rm -rf /*, etc.)
+			rootDeletePatterns := []string{
+				"rm -rf /",      // Original pattern
+				"rm -r /",       // Without force flag
+				"rm -rf / ",     // With trailing space
+				"rm -r / ",      // Without force, with space
+				"rm -rf /*",     // With wildcard
+				"rm -r /*",      // Without force, with wildcard
+				"rm -rf /* ",    // With wildcard and space
+				"rm -r /* ",     // Without force, wildcard, space
+				"rm -rf / *",    // Space between / and *
+				"rm -r / *",     // Without force, space between
+				"rm -rf /bin",   // System directories
+				"rm -rf /usr",   // System directories
+				"rm -rf /etc",   // System directories
+				"rm -rf /var",   // System directories
+				"rm -rf /opt",   // System directories
+				"rm -rf /sbin",  // System directories
+				"rm -rf /lib",   // System directories
+				"rm -rf /lib64", // System directories
+				"rm -rf /sys",   // System directories
+				"rm -rf /proc",  // System directories
+				"rm -rf /dev",   // System directories
+				"rm -rf /boot",  // System directories
+				"rm -rf /root",  // Root home directory
+			}
+			
+			for _, pattern := range rootDeletePatterns {
+				if strings.Contains(lower, pattern) {
+					findings = append(findings, Finding{
+						Severity:       "critical",
+						Code:           "DANGEROUS_DELETE_ROOT",
+						Description:    fmt.Sprintf("Recursive delete targeting root or system directory detected: %s", pattern),
+						Line:           lineNum,
+						Recommendation: "BLOCKED: This command would destroy the system. Never delete from root or system directories.",
+					})
+					break // Only report once
+				}
+			}
+			
+			// Check for home directory deletion patterns
+			// Pattern: rm -rf ~/* or rm -rf $HOME/* (could delete user's entire home)
+			homeDeletePatterns := []string{
+				"rm -rf ~/*",
+				"rm -r ~/*",
+				"rm -rf ~/ *",
+				"rm -r ~/ *",
+				"rm -rf $home/*",
+				"rm -r $home/*",
+				"rm -rf $home/ *",
+				"rm -r $home/ *",
+				"rm -rf $home/*",
+				"rm -r $home/*",
+				"rm -rf $home/ *",
+				"rm -r $home/ *",
+			}
+			
+			for _, pattern := range homeDeletePatterns {
+				if strings.Contains(lower, pattern) {
+					findings = append(findings, Finding{
+						Severity:       "high",
+						Code:           "DANGEROUS_DELETE_HOME",
+						Description:    "Recursive delete targeting home directory detected",
+						Line:           lineNum,
+						Recommendation: "This could delete all user data. Specify exact paths instead of wildcards.",
+					})
+					break // Only report once
+				}
+			}
 		}
 		if strings.Contains(lower, "sudo ") {
 			findings = append(findings, Finding{
