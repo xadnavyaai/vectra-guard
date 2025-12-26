@@ -109,14 +109,21 @@ print_test() {
 
 # Check prerequisites
 check_prerequisites() {
-    if ! command -v vectra-guard &> /dev/null; then
-        if [ -f "$PROJECT_ROOT/vectra-guard" ]; then
-            export PATH="$PROJECT_ROOT:$PATH"
-        else
-            echo -e "${RED}Error: vectra-guard binary not found${NC}"
-            echo "Please build it first: go build -o vectra-guard ."
-            exit 1
+    if [ -f "$PROJECT_ROOT/vectra-guard" ]; then
+        export PATH="$PROJECT_ROOT:$PATH"
+
+        if ! "$PROJECT_ROOT/vectra-guard" version >/dev/null 2>&1; then
+            local version_output
+            version_output=$("$PROJECT_ROOT/vectra-guard" version 2>&1 || true)
+            if echo "$version_output" | grep -qi "Exec format error"; then
+                print_info "Rebuilding vectra-guard for local architecture..."
+                (cd "$PROJECT_ROOT" && go build -o vectra-guard .)
+            fi
         fi
+    elif ! command -v vectra-guard &> /dev/null; then
+        echo -e "${RED}Error: vectra-guard binary not found${NC}"
+        echo "Please build it first: go build -o vectra-guard ."
+        exit 1
     fi
     
     # Use test config if available, otherwise create one
@@ -759,4 +766,3 @@ main() {
 
 # Run main
 main "$@"
-
