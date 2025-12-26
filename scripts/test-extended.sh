@@ -107,22 +107,75 @@ print_test() {
     echo -e "${BLUE}Testing:${NC} $1"
 }
 
+# Get binary path - prioritize local binary
+get_binary() {
+    if [ -f "$PROJECT_ROOT/vectra-guard" ]; then
+        echo "$PROJECT_ROOT/vectra-guard"
+    elif command -v vectra-guard &> /dev/null; then
+        echo "vectra-guard"
+    else
+        echo ""
+    fi
+}
+
 # Check prerequisites
 check_prerequisites() {
+    local needs_rebuild=false
+    
+    # Always rebuild to ensure fresh binary
     if [ -f "$PROJECT_ROOT/vectra-guard" ]; then
-        export PATH="$PROJECT_ROOT:$PATH"
-
+        # Check if binary is executable and works
         if ! "$PROJECT_ROOT/vectra-guard" version >/dev/null 2>&1; then
             local version_output
             version_output=$("$PROJECT_ROOT/vectra-guard" version 2>&1 || true)
             if echo "$version_output" | grep -qi "Exec format error"; then
-                print_info "Rebuilding vectra-guard for local architecture..."
-                (cd "$PROJECT_ROOT" && go build -o vectra-guard .)
+                print_info "Binary architecture mismatch - rebuilding..."
+                needs_rebuild=true
             fi
         fi
+        
+        # Auto-rebuild if source files are newer than binary
+        if [ "$needs_rebuild" = false ]; then
+            local binary_time=$(stat -f "%m" "$PROJECT_ROOT/vectra-guard" 2>/dev/null || stat -c "%Y" "$PROJECT_ROOT/vectra-guard" 2>/dev/null || echo "0")
+            local source_time=0
+            
+            # Check if main.go or analyzer.go are newer
+            for src_file in "$PROJECT_ROOT/main.go" "$PROJECT_ROOT/internal/analyzer/analyzer.go" "$PROJECT_ROOT/internal/analyzer/python_parser.go"; do
+                if [ -f "$src_file" ]; then
+                    local file_time=$(stat -f "%m" "$src_file" 2>/dev/null || stat -c "%Y" "$src_file" 2>/dev/null || echo "0")
+                    if [ "$file_time" -gt "$source_time" ]; then
+                        source_time=$file_time
+                    fi
+                fi
+            done
+            
+            if [ "$source_time" -gt "$binary_time" ]; then
+                print_info "Source files are newer than binary - rebuilding..."
+                needs_rebuild=true
+            fi
+        fi
+        
+        if [ "$needs_rebuild" = true ]; then
+            print_info "Building vectra-guard..."
+            (cd "$PROJECT_ROOT" && go build -o vectra-guard .) || {
+                echo -e "${RED}Error: Failed to build vectra-guard${NC}"
+                exit 1
+            }
+            print_info "Build complete"
+        fi
     elif ! command -v vectra-guard &> /dev/null; then
+        echo -e "${YELLOW}Warning: vectra-guard binary not found, building...${NC}"
+        (cd "$PROJECT_ROOT" && go build -o vectra-guard .) || {
+            echo -e "${RED}Error: Failed to build vectra-guard${NC}"
+            echo "Please build it manually: go build -o vectra-guard ."
+            exit 1
+        }
+    fi
+    
+    # Verify binary exists
+    local binary=$(get_binary)
+    if [ -z "$binary" ]; then
         echo -e "${RED}Error: vectra-guard binary not found${NC}"
-        echo "Please build it first: go build -o vectra-guard ."
         exit 1
     fi
     
@@ -150,9 +203,10 @@ test_detection() {
     
     # Use validate which NEVER executes commands
     # Use test config if available
-    local validate_cmd="vectra-guard validate /dev/stdin"
+    local binary=$(get_binary)
+    local validate_cmd="$binary validate /dev/stdin"
     if [ -f "$PROJECT_ROOT/vectra-guard.test.yaml" ]; then
-        validate_cmd="vectra-guard --config $PROJECT_ROOT/vectra-guard.test.yaml validate /dev/stdin"
+        validate_cmd="$binary --config $PROJECT_ROOT/vectra-guard.test.yaml validate /dev/stdin"
     fi
     local output=$(echo "$attack_cmd" | $validate_cmd 2>&1 || true)
     
@@ -209,10 +263,11 @@ test_execution() {
     fi
     
     # Try to execute (should be blocked or sandboxed)
-    # Use test config if available
-    local exec_cmd="vectra-guard exec --"
+    # Use test config if available (ensures sandbox is enabled)
+    local binary=$(get_binary)
+    local exec_cmd="$binary exec --"
     if [ -f "$PROJECT_ROOT/vectra-guard.test.yaml" ]; then
-        exec_cmd="vectra-guard --config $PROJECT_ROOT/vectra-guard.test.yaml exec --"
+        exec_cmd="$binary --config $PROJECT_ROOT/vectra-guard.test.yaml exec --"
     fi
     
     # Handle commands with shell operators (&&, ||, #, etc.)
@@ -376,7 +431,8 @@ test_filesystem_attacks() {
         print_info "Note: Windows commands may not be detected on Linux systems"
         for cmd in "${windows_cmds[@]}"; do
             print_test "Windows: $cmd"
-            local output=$(echo "$cmd" | vectra-guard validate /dev/stdin 2>&1 || true)
+            local binary=$(get_binary)
+            local output=$(echo "$cmd" | $binary validate /dev/stdin 2>&1 || true)
             if echo "$output" | grep -qi "critical\|high\|dangerous"; then
                 print_blocked "Detected (good!)"
             else
@@ -475,7 +531,8 @@ test_network_attacks() {
     
     for cmd in "${network_cmds[@]}"; do
         print_test "Network (no pipe): $cmd"
-        local output=$(echo "$cmd" | vectra-guard validate /dev/stdin 2>&1 || true)
+        local binary=$(get_binary)
+        local output=$(echo "$cmd" | $binary validate /dev/stdin 2>&1 || true)
         if echo "$output" | grep -qi "critical\|high\|dangerous"; then
             print_blocked "Detected (good!)"
         else
@@ -484,12 +541,6 @@ test_network_attacks() {
         fi
         # Still test execution - should be sandboxed if risky
         test_execution "Network (no pipe): $cmd" "$cmd" || true
-    done
-    
-    for attack in "${attacks[@]}"; do
-        IFS='|' read -r cmd code <<< "$attack"
-        test_detection "Network: $cmd" "$cmd" "$code" || true
-        test_execution "Network: $cmd" "$cmd" || true
     done
     
     if [ "$QUICK_MODE" = false ]; then
@@ -573,12 +624,6 @@ test_git_attacks() {
         test_detection "Git: $cmd" "$cmd" "$code" || true
         test_execution "Git: $cmd" "$cmd" || true
     done
-    
-    for attack in "${attacks[@]}"; do
-        IFS='|' read -r cmd code <<< "$attack"
-        test_detection "Git: $cmd" "$cmd" "$code" || true
-        test_execution "Git: $cmd" "$cmd" || true
-    done
 }
 
 test_injection_attacks() {
@@ -643,7 +688,8 @@ test_bypass_attempts() {
     
     for cmd in "${nested_commands[@]}"; do
         print_test "Bypass (nested): $cmd"
-        local output=$(echo "$cmd" | vectra-guard validate /dev/stdin 2>&1 || true)
+        local binary=$(get_binary)
+        local output=$(echo "$cmd" | $binary validate /dev/stdin 2>&1 || true)
         if echo "$output" | grep -qi "critical\|high\|dangerous"; then
             print_blocked "Detected (good!)"
         else
@@ -669,7 +715,8 @@ test_safe_commands() {
     
     for cmd in "${safe_cmds[@]}"; do
         print_test "Safe: $cmd"
-        local output=$(echo "$cmd" | vectra-guard validate /dev/stdin 2>&1 || true)
+        local binary=$(get_binary)
+        local output=$(echo "$cmd" | $binary validate /dev/stdin 2>&1 || true)
         
         if echo "$output" | grep -qi "critical\|high.*risk\|dangerous"; then
             print_info "False positive (but safe command should work)"
