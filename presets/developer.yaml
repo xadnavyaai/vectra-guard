@@ -2,7 +2,7 @@
 # Optimized for local development with minimal friction
 
 guard_level:
-  level: low  # Only block critical issues
+  level: auto  # Auto-detect context (low in dev, high in prod)
   allow_user_bypass: true
 
 sandbox:

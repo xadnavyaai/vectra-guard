@@ -7,8 +7,8 @@ guard_level:
 
 sandbox:
   enabled: true
-  mode: risky  # Sandbox only high-risk commands
-  security_level: balanced  # Good isolation, reasonable speed
+  mode: always  # Sandbox everything for reproducible builds
+  security_level: strict  # Strong isolation
   runtime: docker
   image: ubuntu:22.04
   timeout: 900  # 15 minutes for CI builds

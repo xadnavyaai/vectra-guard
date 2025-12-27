@@ -266,7 +266,22 @@ git push
 
 ### Configure Policies
 
-**Edit** `vectra-guard.yaml` in your project or `~/.config/vectra-guard/config.yaml`:
+**Edit** `vectra-guard.yaml` in your project or `~/.config/vectra-guard/config.yaml`.
+
+**Quick Start Preset:**
+```yaml
+guard_level:
+  level: auto
+
+sandbox:
+  enabled: true
+  mode: auto
+  security_level: balanced
+  enable_cache: true
+```
+See [CONFIGURATION.md](CONFIGURATION.md) for full details.
+
+### Configure Policies
 
 ```yaml
 logging:
@@ -622,4 +637,3 @@ Just use Cursor, VSCode, or Terminal as normal. Everything is automatically:
 *Remember: The best security is the security you don't have to think about.*
 
 </div>
-

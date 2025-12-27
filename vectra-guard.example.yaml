@@ -1,26 +1,95 @@
-# Vectra Guard Configuration
+# Vectra Guard
 # Simple, clean, rock solid protection
 
 # ============================================
-# GUARD LEVEL (Auto-Detection Recommended)
+# QUICK START PRESETS (Copy & Paste)
 # ============================================
 
+# PRESET 1: DEVELOPER (Recommended)
+# Best for local development. Fast, unobtrusive, but safe.
+#
+# guard_level:
+#   level: auto
+#   allow_user_bypass: true
+# sandbox:
+#   enabled: true
+#   mode: auto              # Sandbox only risky commands
+#   security_level: balanced
+#   enable_cache: true      # 10x faster subsequent runs
+#   network_mode: restricted # Allow outbound, block inbound
+
+# PRESET 2: CI/CD PIPELINE
+# For automated testing and builds.
+#
+# guard_level:
+#   level: high
+# sandbox:
+#   enabled: true
+#   mode: always            # Sandbox everything
+#   security_level: strict
+#   enable_cache: true
+
+# PRESET 3: PRODUCTION
+# Maximum security for production environments.
+#
+# guard_level:
+#   level: paranoid         # Require approval for everything
+# sandbox:
+#   enabled: true
+#   mode: always
+#   security_level: paranoid
+#   network_mode: none
+
+# ============================================
+# MAIN CONFIGURATION
+# ============================================
+
+# GUARD LEVEL (Auto-Detection Recommended)
+#
+# Controls WHAT requires approval or is blocked.
+# Options: auto (recommended), low, medium, high, paranoid
+#
+# 'auto' intelligently detects context:
+#   - Local dev branch → low/medium
+#   - Production branch → paranoid
+#   - "deploy" command → high
 guard_level:
-  # Security level: auto (recommended), low, medium, high, paranoid
-  # 
-  # 'auto' intelligently detects context and adjusts protection:
-  #   - Local dev (feature branches) → low protection
-  #   - Staging environments → high protection  
-  #   - Production environments → paranoid (requires approval)
-  #   - Ambiguous context → medium (safe default)
-  #
-  # Detection considers: git branch, URLs, DB names, file paths, command strings
-  # When in doubt, chooses the most protective level (safety first!)
   level: auto
   
-  # Override auto-detection: VECTRA_GUARD_LEVEL=low vg exec ...
+  # Override with: VECTRA_GUARD_LEVEL=low vg exec ...
   allow_user_bypass: true
   bypass_env_var: VECTRAGUARD_BYPASS
+
+# SANDBOX EXECUTION
+#
+# Controls WHERE commands run (Host vs Sandbox).
+sandbox:
+  enabled: true
+  
+  # WHEN to sandbox:
+  # - auto:   Sandbox only medium/high risk commands (Recommended)
+  # - always: Sandbox everything (Safest)
+  # - risky:  Sandbox only high/critical risk
+  mode: auto
+  
+  # HOW STRICT the sandbox is:
+  # - permissive: Fast, shares host network
+  # - balanced:   Good isolation, allowed outbound net (Recommended)
+  # - strict:     Stronger isolation, limited capabilities
+  # - paranoid:   No network, read-only root, minimal caps
+  security_level: balanced
+  
+  # RUNTIME:
+  # - auto:   Best available (Docker > Podman > Namespace)
+  # - docker: Most compatible
+  runtime: auto
+  
+  # PERFORMANCE:
+  # Enable caching to speed up installs (npm, pip, go, etc.)
+  enable_cache: true
+  
+  # Network access for sandbox
+  network_mode: restricted
 
 # ============================================
 # ENVIRONMENT DETECTION
@@ -48,15 +117,11 @@ production_indicators:
     # - preprod
 
 # ============================================
-# LOGGING
+# LOGGING & POLICIES
 # ============================================
 
 logging:
   format: json  # Options: json, text
-
-# ============================================
-# SECURITY POLICIES
-# ============================================
 
 policies:
   # Git Operations
@@ -103,97 +168,32 @@ env_protection:
   block_dotenv_read: true
 
 # ============================================
-# SANDBOX EXECUTION (Phase 1-7 Implementation)
+# ADVANCED SANDBOX SETTINGS
 # ============================================
 
-sandbox:
-  # Enable sandbox execution
-  enabled: true
-  
-  # Execution mode: auto (smart), always, risky (high-risk only), never
-  # 'auto' is recommended - sandbox medium+ risk commands automatically
-  mode: auto
-  
-  # Security level: permissive, balanced, strict, paranoid
-  # balanced = good isolation without sacrificing speed
-  security_level: balanced
-  
-  # Runtime: docker, podman, process
-  # docker = most compatible, process = fastest (Linux only)
-  runtime: docker
-  
-  # Container image to use
-  image: ubuntu:22.04
-  
-  # Execution timeout (seconds)
-  timeout: 300
-  
-  # Cache strategy for faster dev cycles
-  enable_cache: true
-  # cache_dirs:
-  #   - ~/.npm
-  #   - ~/.cargo
-  #   - ~/go/pkg
-  
-  # Network mode: none, restricted, full
-  # restricted = allow outbound, block inbound (recommended)
-  network_mode: restricted
-  
-  # Seccomp profile path (optional, for strict/paranoid)
-  # seccomp_profile: /path/to/seccomp-profile.json
-  
-  # Environment variables to pass through
-  env_whitelist:
-    - HOME
-    - USER
-    - PATH
-    - SHELL
-    - TERM
-    - PWD
-  
-  # Custom bind mounts (optional)
-  # bind_mounts:
-  #   - host_path: /path/on/host
-  #     container_path: /path/in/container
-  #     read_only: false
-  
-  # Observability and metrics
-  enable_metrics: true
-  log_output: false
-  
-  # Trust store path (for "approve and remember")
-  # trust_store_path: ~/.vectra-guard/trust.json
-
-# ============================================
-# DEVELOPER PRESET (Quick Start)
-# ============================================
-# 
-# For a "just works" developer experience, use these settings:
-# 
-# guard_level:
-#   level: low              # Minimal friction
-# 
+# (Most users won't need to change these)
+#
 # sandbox:
-#   enabled: true
-#   mode: auto              # Smart sandboxing
-#   security_level: permissive  # Fast, less isolated
-#   enable_cache: true      # Reuse deps
-#   network_mode: full      # No network restrictions
-# 
-# This gives you:
-# - Low-friction development
-# - Automatic sandboxing for risky commands
-# - Fast execution with caching
-# - "Approve and remember" for trusted commands
-
-# ============================================
-# NOTES
-# ============================================
-# 
-# For advanced configurations and presets, see: docs/CONFIGURATION.md
-# 
-# Quick override examples:
-#   VECTRA_GUARD_LEVEL=low vg exec "risky command"     # Temporary low protection
-#   VECTRA_GUARD_LEVEL=paranoid vg exec "prod deploy"  # Force paranoid mode
-# 
-# The 'auto' level is recommended - let Vectra Guard be smart about context!
+#   image: ubuntu:22.04
+#   timeout: 300
+#   
+#   # Custom cache directories
+#   # cache_dirs:
+#   #   - ~/.npm
+#   #   - ~/.cargo
+#   
+#   # Environment variables to pass through
+#   env_whitelist:
+#     - HOME
+#     - USER
+#     - PATH
+#     - SHELL
+#     - TERM
+#     - PWD
+#   
+#   # Observability
+#   enable_metrics: true
+#   log_output: false
+#   
+#   # Trust store path (for "approve and remember")
+#   # trust_store_path: ~/.vectra-guard/trust.json

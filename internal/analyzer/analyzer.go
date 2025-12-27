@@ -74,10 +74,10 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				"rm -r ~/*",
 				"rm -rf ~/ *",
 				"rm -r ~/ *",
-				"rm -rf $HOME/*",
-				"rm -r $HOME/*",
-				"rm -rf $HOME/ *",
-				"rm -r $HOME/ *",
+				"rm -rf $home/*",
+				"rm -r $home/*",
+				"rm -rf $home/ *",
+				"rm -r $home/ *",
 			}
 
 			// Also check for expanded home paths like /home/username/* or /home/*

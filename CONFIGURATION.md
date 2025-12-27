@@ -4,14 +4,97 @@ This document provides detailed configuration options and preset examples for Ve
 
 ## Table of Contents
 
+- [Quick Start Presets](#quick-start-presets)
+- [How Protection Levels Work](#how-protection-levels-work)
 - [Configuration File Locations](#configuration-file-locations)
 - [Basic Configuration](#basic-configuration)
 - [Guard Level (Auto-Detection)](#guard-level-auto-detection)
 - [Production Indicators](#production-indicators)
 - [Security Policies](#security-policies)
-- [Preset Configurations](#preset-configurations)
+- [Sandbox Configuration](#sandbox-configuration)
 - [Advanced Configuration](#advanced-configuration)
-- [Environment Variable Overrides](#environment-variable-overrides)
+
+---
+
+## Quick Start Presets
+
+For most users, copying one of these presets into your `vectra-guard.yaml` is all you need.
+
+### 1. Developer Preset (Recommended) 👩‍💻
+*Best for local development. Fast, unobtrusive, but safe.*
+
+```yaml
+guard_level:
+  level: auto             # Auto-detect context (low in dev, high in prod)
+  allow_user_bypass: true # Allow overriding with env var
+
+sandbox:
+  enabled: true
+  mode: auto              # Only sandbox risky commands (like npm install)
+  security_level: balanced # Good isolation, allows outbound network
+  enable_cache: true      # 10x faster subsequent runs
+```
+
+### 2. CI/CD Pipeline 🤖
+*For automated testing and builds.*
+
+```yaml
+guard_level:
+  level: high             # Block critical/high risks without approval
+
+sandbox:
+  enabled: true
+  mode: always            # Run EVERYTHING in sandbox for isolation
+  security_level: strict  # Stricter isolation
+  enable_cache: true      # Speed up builds
+```
+
+### 3. Production / Zero Trust 🔒
+*Maximum security for production environments.*
+
+```yaml
+guard_level:
+  level: paranoid         # Require explicit approval for everything
+
+sandbox:
+  enabled: true
+  mode: always
+  security_level: paranoid # No network, read-only root, minimal caps
+  network_mode: none       # Completely offline
+```
+
+---
+
+## How Protection Levels Work
+
+Vectra Guard has three main "knobs" to control security. Understanding how they interact helps you tune it perfectly.
+
+### 1. Guard Level (`guard_level.level`)
+**Controls "What do we ask the user about?"**
+- `low`: Only block Critical risks.
+- `medium`: Block Critical + High risks.
+- `high`: Block Critical + High + Medium risks.
+- `paranoid`: Everything requires approval.
+- `auto`: Starts at `medium`, but bumps to `paranoid` if it detects you are on a `production` branch or handling sensitive data.
+
+### 2. Sandbox Mode (`sandbox.mode`)
+**Controls "Where does the command run?"**
+- `auto`: Safe commands -> Host. Risky commands -> Sandbox.
+- `always`: Everything -> Sandbox.
+- `risky`: Only High/Critical risk -> Sandbox.
+
+### 3. Sandbox Security Level (`sandbox.security_level`)
+**Controls "How locked down is the sandbox?"**
+- `permissive`: Shares host network, some capabilities. (Fastest)
+- `balanced`: Own network namespace (outbound allowed), standard caps. (Default)
+- `strict`: Restricted network, dropped caps.
+- `paranoid`: No network, read-only filesystem, no caps.
+
+**Example Scenario:**
+If you run `npm install`:
+- `guard_level: auto` sees "npm install" is medium risk -> Approves execution.
+- `sandbox.mode: auto` sees "npm install" modifies files/network -> Sends to Sandbox.
+- `sandbox.security_level: balanced` -> Sandbox allows downloading packages.
 
 ---
 
@@ -81,25 +164,7 @@ When `level: auto`, Vectra Guard intelligently analyzes:
 | `paranoid` | Everything requires approval | Production, untrusted code, maximum safety |
 | `off` | No protection | Testing only (not recommended) |
 
-### Examples
-
-```yaml
-# Auto-detect (recommended)
-guard_level:
-  level: auto
-
-# Fixed level
-guard_level:
-  level: high
-  
-# Allow bypass with environment variable
-guard_level:
-  level: auto
-  allow_user_bypass: true
-  bypass_env_var: VECTRAGUARD_BYPASS
-```
-
-**Runtime Override**:
+### Runtime Override
 
 ```bash
 # Temporarily lower protection
@@ -213,216 +278,6 @@ policies:
 ```
 
 **Wildcard matching**: Use `*` for flexible patterns.
-
----
-
-## Preset Configurations
-
-Copy and paste these presets into your `vectra-guard.yaml`:
-
-### Preset 1: Local Development (Relaxed)
-
-Perfect for solo development on feature branches.
-
-```yaml
-guard_level:
-  level: low
-  allow_user_bypass: true
-
-production_indicators:
-  branches:
-    - main
-    - master
-  keywords:
-    - prod
-    - production
-
-policies:
-  monitor_git_ops: true
-  block_force_git: false  # Allow force push in dev
-  detect_prod_env: true
-  only_destructive_sql: true
-  
-  allowlist:
-    - "echo *"
-    - "ls *"
-    - "git *"
-    - "npm *"
-    - "yarn *"
-```
-
-### Preset 2: Team Collaboration (Balanced) - **DEFAULT**
-
-Good for team environments with shared repositories.
-
-```yaml
-guard_level:
-  level: auto  # Smart detection
-  allow_user_bypass: true
-
-production_indicators:
-  branches:
-    - main
-    - master
-    - production
-    - release
-  keywords:
-    - prod
-    - production
-    - staging
-    - stg
-
-policies:
-  monitor_git_ops: true
-  block_force_git: true  # Block force push
-  detect_prod_env: true
-  only_destructive_sql: true
-  
-  allowlist:
-    - "echo *"
-    - "ls *"
-    - "git status"
-    - "git log"
-    - "npm install"
-    - "npm test"
-  
-  denylist:
-    - "rm -rf /"
-    - "sudo rm"
-    - "git push --force"
-```
-
-### Preset 3: Staging Environment (Strict)
-
-For staging environments with production-like data.
-
-```yaml
-guard_level:
-  level: high
-  allow_user_bypass: true
-
-production_indicators:
-  branches:
-    - main
-    - master
-    - staging
-    - uat
-  keywords:
-    - prod
-    - production
-    - staging
-    - stg
-    - uat
-
-policies:
-  monitor_git_ops: true
-  block_force_git: true
-  detect_prod_env: true
-  only_destructive_sql: true
-  
-  allowlist:
-    - "git status"
-    - "git log"
-    - "ls *"
-    - "cat *"
-  
-  denylist:
-    - "rm -rf *"
-    - "sudo *"
-    - "DROP *"
-    - "TRUNCATE *"
-```
-
-### Preset 4: Production (Maximum Security)
-
-For production deployments and critical operations.
-
-```yaml
-guard_level:
-  level: paranoid  # Require approval for everything
-  allow_user_bypass: false  # No bypass allowed
-
-production_indicators:
-  branches:
-    - main
-    - master
-    - production
-    - release
-    - live
-  keywords:
-    - prod
-    - production
-    - live
-
-policies:
-  monitor_git_ops: true
-  block_force_git: true
-  detect_prod_env: true
-  only_destructive_sql: false  # Flag ALL database operations
-  
-  allowlist:
-    - "git status"
-    - "git log"
-  
-  denylist:
-    - "rm *"
-    - "sudo *"
-    - "DROP *"
-    - "DELETE *"
-    - "TRUNCATE *"
-    - "ALTER *"
-    - "git push"
-```
-
-### Preset 5: AI Agent Safety (Paranoid)
-
-For untrusted AI agents or experimental automation.
-
-```yaml
-guard_level:
-  level: paranoid
-  allow_user_bypass: false
-
-production_indicators:
-  branches:
-    - main
-    - master
-  keywords:
-    - prod
-    - production
-    - staging
-
-policies:
-  monitor_git_ops: true
-  block_force_git: true
-  detect_prod_env: true
-  only_destructive_sql: false
-  
-  # Very restrictive allowlist
-  allowlist:
-    - "echo *"
-    - "ls"
-    - "pwd"
-    - "git status"
-  
-  # Aggressive denylist
-  denylist:
-    - "rm *"
-    - "sudo *"
-    - "curl * | *"
-    - "wget * | *"
-    - "git push"
-    - "git commit"
-    - "DROP *"
-    - "DELETE *"
-    - "UPDATE *"
-
-env_protection:
-  enabled: true
-  masking_mode: full  # Completely hide sensitive values
-  block_env_access: true
-  block_dotenv_read: true
-```
 
 ---
 
@@ -583,57 +438,6 @@ VECTRA_GUARD_LEVEL=low vg exec "command"
 
 ---
 
-## Examples by Use Case
-
-### CI/CD Pipeline
-
-```yaml
-guard_level:
-  level: high
-  allow_user_bypass: false
-
-policies:
-  monitor_git_ops: true
-  block_force_git: true
-  
-  allowlist:
-    - "npm ci"
-    - "npm test"
-    - "npm run build"
-    - "git tag *"
-```
-
-### Development Container
-
-```yaml
-guard_level:
-  level: low
-  allow_user_bypass: true
-
-policies:
-  monitor_git_ops: false  # Less restrictive in containers
-  detect_prod_env: true
-```
-
-### Shared Server
-
-```yaml
-guard_level:
-  level: high
-  allow_user_bypass: false
-
-policies:
-  monitor_git_ops: true
-  block_force_git: true
-  detect_prod_env: true
-
-env_protection:
-  enabled: true
-  block_env_access: true
-```
-
----
-
 ## Getting Help
 
 - **View current config**: `vg init --show-config`
@@ -644,4 +448,3 @@ env_protection:
 ---
 
 **Remember**: Vectra Guard's `auto` level is designed to be smart. Start there, then customize as needed! 🛡️
-
