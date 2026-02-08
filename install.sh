@@ -181,7 +181,44 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
         NEW_VERSION=$("$INSTALL_DIR/$BINARY_NAME" version 2>&1 | head -1 || "$INSTALL_DIR/$BINARY_NAME" --help 2>&1 | head -1 || echo "installed")
     fi
     echo ""
-    
+
+    # Add install directory to PATH in shell config if not already there
+    case ":$PATH:" in
+        *":$INSTALL_DIR:"*) ;;
+        *)
+            ADDED_TO=""
+            for RC in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile"; do
+                if [ -f "$RC" ]; then
+                    if grep -q "Vectra Guard.*PATH\|[.]local/bin\|$INSTALL_DIR" "$RC" 2>/dev/null; then
+                        continue
+                    fi
+                    echo "" >> "$RC"
+                    echo "# Vectra Guard: add install dir to PATH" >> "$RC"
+                    if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
+                        echo 'export PATH="$PATH:$HOME/.local/bin"' >> "$RC"
+                    else
+                        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
+                    fi
+                    ADDED_TO="${ADDED_TO} ${RC}"
+                elif [ "$RC" = "$HOME/.zshrc" ] || [ "$RC" = "$HOME/.bashrc" ]; then
+                    # Create .zshrc or .bashrc if missing so PATH is set in new shells
+                    echo "# Vectra Guard: add install dir to PATH" >> "$RC"
+                    if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
+                        echo 'export PATH="$PATH:$HOME/.local/bin"' >> "$RC"
+                    else
+                        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
+                    fi
+                    ADDED_TO="${ADDED_TO} ${RC}"
+                fi
+            done
+            if [ -n "$ADDED_TO" ]; then
+                echo "📂 Added $INSTALL_DIR to PATH in:$ADDED_TO"
+                echo "   Run: source ~/.zshrc   (or open a new terminal)"
+                echo ""
+            fi
+            ;;
+    esac
+
     if [ "${UPGRADE:-false}" = true ]; then
         echo "✅ Vectra Guard upgraded successfully!"
         echo ""
