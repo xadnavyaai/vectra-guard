@@ -29,8 +29,8 @@ Canonical counts for the six-repo scan come from **similar-agent-scan-raw.txt** 
 
 | Rule | Count | Source |
 |------|-------|--------|
-| PY_EXTERNAL_HTTP | 1,245 | similar-agent-scan-raw.txt |
-| PY_REMOTE_HTTP | 175 | similar-agent-scan-raw.txt |
+| PY_EXTERNAL_HTTP | 1,196 | similar-agent-scan-raw.txt |
+| PY_REMOTE_HTTP | 171 | similar-agent-scan-raw.txt |
 | BIND_ALL_INTERFACES | 22 | similar-agent-scan-raw.txt |
 
 Secrets totals in the blog table are from `vg audit repo` with improved detection: lockfiles skipped, and ENTROPY_CANDIDATE only when the line has secret context (token/api_key/secret etc.) plus FP filters (paths, slugs, UUIDs, identifiers), so counts are lower and more actionable (~7.5K total across six repos).
