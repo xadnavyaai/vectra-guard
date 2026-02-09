@@ -182,46 +182,50 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
     fi
     echo ""
 
-    # Add install directory to PATH in shell config if not already there
-    case ":$PATH:" in
-        *":$INSTALL_DIR:"*) ;;
-        *)
-            ADDED_TO=""
-            for RC in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile"; do
-                if [ -f "$RC" ]; then
-                    if grep -q "Vectra Guard.*PATH\|[.]local/bin\|$INSTALL_DIR" "$RC" 2>/dev/null; then
-                        continue
-                    fi
-                    echo "" >> "$RC"
-                    echo "# Vectra Guard: add install dir to PATH" >> "$RC"
-                    if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
-                        echo 'export PATH="$PATH:$HOME/.local/bin"' >> "$RC"
-                    else
-                        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
-                    fi
-                    echo "alias vg='vectra-guard'" >> "$RC"
-                    echo "alias vectraguard='vectra-guard'" >> "$RC"
-                    ADDED_TO="${ADDED_TO} ${RC}"
-                elif [ "$RC" = "$HOME/.zshrc" ] || [ "$RC" = "$HOME/.bashrc" ]; then
-                    # Create .zshrc or .bashrc if missing so PATH is set in new shells
-                    echo "# Vectra Guard: add install dir to PATH" >> "$RC"
-                    if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
-                        echo 'export PATH="$PATH:$HOME/.local/bin"' >> "$RC"
-                    else
-                        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
-                    fi
-                    echo "alias vg='vectra-guard'" >> "$RC"
-                    echo "alias vectraguard='vectra-guard'" >> "$RC"
-                    ADDED_TO="${ADDED_TO} ${RC}"
-                fi
-            done
-            if [ -n "$ADDED_TO" ]; then
-                echo "📂 Added $INSTALL_DIR to PATH in:$ADDED_TO"
-                echo "   Run: source ~/.zshrc   (or open a new terminal)"
-                echo ""
+    # Add install directory to PATH and vg/vectraguard aliases to shell config.
+    # Always try each rc file (do not skip based on current process PATH), so that
+    # .zshrc gets the block even when the installer runs under bash with PATH already set.
+    ADDED_TO=""
+    for RC in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile"; do
+        if [ -f "$RC" ]; then
+            # Only skip if our block is already present (comment + vg alias). Do not skip
+            # just because .local/bin or PATH appears from another tool.
+            if grep -q "# Vectra Guard" "$RC" 2>/dev/null && grep -q "alias vg='vectra-guard'" "$RC" 2>/dev/null; then
+                continue
             fi
-            ;;
-    esac
+            echo "" >> "$RC"
+            echo "# Vectra Guard: add install dir to PATH" >> "$RC"
+            if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
+                echo 'export PATH="$PATH:$HOME/.local/bin"' >> "$RC"
+            else
+                echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
+            fi
+            echo "alias vg='vectra-guard'" >> "$RC"
+            echo "alias vectraguard='vectra-guard'" >> "$RC"
+            ADDED_TO="${ADDED_TO} ${RC}"
+        elif [ "$RC" = "$HOME/.zshrc" ] || [ "$RC" = "$HOME/.bashrc" ]; then
+            # Create .zshrc or .bashrc if missing so PATH is set in new shells
+            echo "# Vectra Guard: add install dir to PATH" >> "$RC"
+            if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
+                echo 'export PATH="$PATH:$HOME/.local/bin"' >> "$RC"
+            else
+                echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
+            fi
+            echo "alias vg='vectra-guard'" >> "$RC"
+            echo "alias vectraguard='vectra-guard'" >> "$RC"
+            ADDED_TO="${ADDED_TO} ${RC}"
+        fi
+    done
+    if [ -n "$ADDED_TO" ]; then
+        echo "📂 Added $INSTALL_DIR to PATH and aliases (vg, vectraguard) in:$ADDED_TO"
+        echo "   In this shell right now, run:"
+        echo "     export PATH=\"\$PATH:$INSTALL_DIR\""
+        echo "     alias vg='vectra-guard'"
+        echo "     alias vectraguard='vectra-guard'"
+        echo "   For future shells: if you use zsh, run \"source ~/.zshrc\" in zsh (or open a new terminal)."
+        echo "   If you use bash, run \"source ~/.bashrc\" in bash. Do not source ~/.zshrc from bash (zsh-only syntax can break)."
+        echo ""
+    fi
 
     if [ "${UPGRADE:-false}" = true ]; then
         echo "✅ Vectra Guard upgraded successfully!"
