@@ -24,7 +24,7 @@ Across 6 repos we saw **2,149** static code findings. The dominant pattern is **
 
 ## Pattern 1: External and Remote HTTP (PY_EXTERNAL_HTTP, PY_REMOTE_HTTP, GO_*)
 
-**Counts (from scan):** PY_EXTERNAL_HTTP 1,245 | PY_REMOTE_HTTP 175 | GO_NET_HTTP 20 | GO_EXTERNAL_HTTP 12.
+**Counts (from scan):** PY_EXTERNAL_HTTP 1,196 | PY_REMOTE_HTTP 171 | GO_NET_HTTP 20 | GO_EXTERNAL_HTTP 12.
 
 **What it is:** Code that uses non-localhost HTTP(S) URLs or makes remote HTTP requests (e.g. `requests.get`, `urllib`, `net/http`). The scanner flags both the presence of external URLs and generic remote HTTP usage.
 
@@ -46,7 +46,7 @@ Across 6 repos we saw **2,149** static code findings. The dominant pattern is **
 
 ## Pattern 2: Environment and Secret Access (PY_ENV_ACCESS, GO_ENV_READ)
 
-**Counts:** PY_ENV_ACCESS 459 | GO_ENV_READ 37.
+**Counts:** PY_ENV_ACCESS 430 | GO_ENV_READ 37.
 
 **What it is:** Access to environment variables or `.env`-style config (e.g. `os.getenv`, `os.environ`, `godotenv`). The scanner does not distinguish “safe” vars (e.g. `LOG_LEVEL`) from secrets (e.g. `API_KEY`).
 
@@ -66,7 +66,7 @@ Across 6 repos we saw **2,149** static code findings. The dominant pattern is **
 
 ## Pattern 3: Subprocess and Shell Execution (PY_SUBPROCESS, GO_EXEC_COMMAND)
 
-**Counts:** PY_SUBPROCESS 175 | GO_EXEC_COMMAND 2.
+**Counts:** PY_SUBPROCESS 172 | GO_EXEC_COMMAND 2.
 
 **What it is:** Use of `subprocess`, `os.system`, `exec.Command`, or similar to run external commands or shells.
 
@@ -125,7 +125,7 @@ Across 6 repos we saw **2,149** static code findings. The dominant pattern is **
 
 ## Pattern 6: Unauthenticated Access (UNAUTHENTICATED_ACCESS)
 
-**Count:** 5 (config).
+**Count:** 3 (config).
 
 **What it is:** Config that disables or weakens auth (e.g. `auth: false`, `secure: false`). The scanner looks for these patterns in YAML/JSON.
 
