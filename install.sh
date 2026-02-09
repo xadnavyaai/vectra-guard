@@ -199,6 +199,8 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
                     else
                         echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
                     fi
+                    echo "alias vg='vectra-guard'" >> "$RC"
+                    echo "alias vectraguard='vectra-guard'" >> "$RC"
                     ADDED_TO="${ADDED_TO} ${RC}"
                 elif [ "$RC" = "$HOME/.zshrc" ] || [ "$RC" = "$HOME/.bashrc" ]; then
                     # Create .zshrc or .bashrc if missing so PATH is set in new shells
@@ -208,6 +210,8 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
                     else
                         echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC"
                     fi
+                    echo "alias vg='vectra-guard'" >> "$RC"
+                    echo "alias vectraguard='vectra-guard'" >> "$RC"
                     ADDED_TO="${ADDED_TO} ${RC}"
                 fi
             done
