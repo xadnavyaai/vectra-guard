@@ -3,7 +3,7 @@
 ## ✅ Pre-Release Checklist
 
 ### Build & Test
-- [x] Build binaries for supported platforms (darwin/amd64, darwin/arm64, linux/amd64, linux/arm64)
+- [x] Build binaries for supported platforms (darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64, windows/arm64)
 - [x] Verify version string is correct (v0.0.1)
 - [x] Generate checksums for all binaries
 - [x] Run basic release tests in Docker (100% pass rate)
@@ -16,6 +16,8 @@
   - `vectra-guard-darwin-arm64` (2.8M)
   - `vectra-guard-linux-amd64` (2.9M)
   - `vectra-guard-linux-arm64` (2.9M)
+  - `vectra-guard-windows-amd64.exe`
+  - `vectra-guard-windows-arm64.exe`
   - `checksums.txt` (SHA256 checksums)
 
 ### Documentation
@@ -46,6 +48,8 @@ Upload all files from `dist/` folder:
 - `vectra-guard-darwin-arm64`
 - `vectra-guard-linux-amd64`
 - `vectra-guard-linux-arm64`
+- `vectra-guard-windows-amd64.exe`
+- `vectra-guard-windows-arm64.exe`
 - `checksums.txt`
 
 ### 4. Publish Release

@@ -2,14 +2,15 @@
 
 ## 🎉 First Stable Release
 
-This is the first release focused on **macOS** and **Debian Linux** (x86_64, arm64) with a secure-by-default command guard, sandboxing, and shell tracking.
+This is the first release focused on **macOS**, **Linux**, and **Windows** (x86_64, arm64) with a secure-by-default command guard, sandboxing, and shell tracking.
 
 ---
 
 ## ✅ Supported Platforms
 
 - **macOS** (x86_64, arm64)
-- **Debian Linux** (x86_64, arm64)
+- **Linux** (x86_64, arm64)
+- **Windows** (x86_64, arm64)
 
 ---
 
@@ -41,8 +42,14 @@ This is the first release focused on **macOS** and **Debian Linux** (x86_64, arm
 ---
 ## 📦 Installation
 
+**macOS & Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
 ```
 
 ---

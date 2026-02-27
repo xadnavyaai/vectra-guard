@@ -63,12 +63,17 @@ cve:
 
 ## 📦 Installation
 
-**Recommended one-liner:**
+**macOS & Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-**With full setup:**
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
+```
+
+**With full setup (macOS/Linux):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
 ```
