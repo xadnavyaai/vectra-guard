@@ -449,11 +449,12 @@ func execute(args []string) error {
 			force := subFlags.Bool("force", false, "Overwrite existing files")
 			targets := subFlags.String("targets", "", "Comma/space-separated targets (e.g., agents,claude,cursor)")
 			list := subFlags.Bool("list", false, "List available targets and exit")
+			yes := subFlags.Bool("yes", false, "Auto-confirm prompts (non-interactive mode)")
 			if err := subFlags.Parse(seedArgs); err != nil {
 				return err
 			}
 			selected := parseSeedTargets(*targets)
-			return runSeedAgents(ctx, *target, *force, selected, *list)
+			return runSeedAgents(ctx, *target, *force, selected, *list, *yes)
 		default:
 			return usageError()
 		}

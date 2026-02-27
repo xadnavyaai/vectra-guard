@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -9,6 +10,11 @@ import (
 	"time"
 
 	"github.com/vectra-guard/vectra-guard/internal/config"
+)
+
+const (
+	MarkerBegin = "<!-- vectraguard:begin -->"
+	MarkerEnd   = "<!-- vectraguard:end -->"
 )
 
 //go:embed templates/**
@@ -99,6 +105,11 @@ func WriteAgentInstructions(targetDir string, force bool, selected []string) ([]
 
 	var results []Result
 	for _, target := range targets {
+		// Skip openclaw — handled separately via WriteOpenClawInstructions
+		if target.Key == "openclaw" {
+			continue
+		}
+
 		dst := filepath.Join(targetDir, target.DestPath)
 		if !force {
 			if _, err := os.Stat(dst); err == nil {
@@ -196,6 +207,81 @@ func detectProjectTypes(workdir string) []string {
 		}
 	}
 	return types
+}
+
+// GetTemplateContent reads a template file from the embedded FS.
+func GetTemplateContent(srcPath string) ([]byte, error) {
+	return fs.ReadFile(templates, srcPath)
+}
+
+// MergeMarkedSection merges new VectraGuard content into existing file content
+// using marker-based detection. Returns the merged content and a status string.
+//
+// Status values:
+//   - "written"  — no existing content, created with markers
+//   - "merged"   — existing content without markers, appended marked section
+//   - "updated"  — existing content with markers, replaced marked section
+func MergeMarkedSection(existing, newContent []byte) ([]byte, string) {
+	markedNew := wrapWithMarkers(newContent)
+
+	if len(existing) == 0 {
+		return markedNew, "written"
+	}
+
+	beginIdx := bytes.Index(existing, []byte(MarkerBegin))
+	endIdx := bytes.Index(existing, []byte(MarkerEnd))
+
+	// Both markers found and in correct order → replace
+	if beginIdx >= 0 && endIdx >= 0 && endIdx > beginIdx {
+		var buf bytes.Buffer
+		buf.Write(existing[:beginIdx])
+		buf.Write(markedNew)
+		buf.Write(existing[endIdx+len(MarkerEnd):])
+		return buf.Bytes(), "updated"
+	}
+
+	// No valid marker pair → append
+	var buf bytes.Buffer
+	buf.Write(existing)
+	if len(existing) > 0 && existing[len(existing)-1] != '\n' {
+		buf.WriteByte('\n')
+	}
+	buf.WriteByte('\n')
+	buf.Write(markedNew)
+	return buf.Bytes(), "merged"
+}
+
+// wrapWithMarkers wraps content with VectraGuard begin/end markers.
+func wrapWithMarkers(content []byte) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(MarkerBegin)
+	buf.WriteByte('\n')
+	buf.Write(content)
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		buf.WriteByte('\n')
+	}
+	buf.WriteString(MarkerEnd)
+	return buf.Bytes()
+}
+
+// WriteOpenClawInstructions reads the existing file at destPath (if any),
+// merges the VectraGuard template content using markers, and writes the result.
+func WriteOpenClawInstructions(destPath string, templateContent []byte) (Result, error) {
+	existing, err := os.ReadFile(destPath)
+	if err != nil && !os.IsNotExist(err) {
+		return Result{}, fmt.Errorf("read existing %s: %w", destPath, err)
+	}
+
+	merged, status := MergeMarkedSection(existing, templateContent)
+
+	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+		return Result{}, fmt.Errorf("create directory for %s: %w", destPath, err)
+	}
+	if err := os.WriteFile(destPath, merged, 0o644); err != nil {
+		return Result{}, fmt.Errorf("write %s: %w", destPath, err)
+	}
+
+	return Result{Path: destPath, Status: status}, nil
 }
 
 // ScanAgentFiles checks all available targets for existence/size/age.

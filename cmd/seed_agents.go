@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/vectra-guard/vectra-guard/internal/seed"
 )
 
-func runSeedAgents(ctx context.Context, target string, force bool, targets []string, listOnly bool) error {
+func runSeedAgents(ctx context.Context, target string, force bool, targets []string, listOnly bool, autoYes bool) error {
 	if target == "" {
 		target = "."
 	}
@@ -47,11 +48,37 @@ func runSeedAgents(ctx context.Context, target string, force bool, targets []str
 	// Scan pre-state
 	preScan := seed.ScanAgentFiles(target)
 
-	// Perform seeding
+	// Check if openclaw is in selected targets
+	hasOpenClaw := false
+	for _, t := range targets {
+		if t == "openclaw" {
+			hasOpenClaw = true
+			break
+		}
+	}
+	// Also check resolved targets (if no targets specified, default is "agents" only)
+	if len(targets) == 0 {
+		hasOpenClaw = false
+	}
+
+	// Handle openclaw separately with smart detection
+	var openClawResults []seed.Result
+	if hasOpenClaw {
+		ocResults, err := handleOpenClawSeed(target, autoYes)
+		if err != nil {
+			return err
+		}
+		openClawResults = ocResults
+	}
+
+	// Perform seeding for remaining targets (openclaw is skipped inside WriteAgentInstructions)
 	results, err := seed.WriteAgentInstructions(target, force, targets)
 	if err != nil {
 		return err
 	}
+
+	// Combine results: standard targets + openclaw
+	results = append(results, openClawResults...)
 
 	// Scan post-state
 	postScan := seed.ScanAgentFiles(target)
@@ -79,6 +106,114 @@ func runSeedAgents(ctx context.Context, target string, force bool, targets []str
 	// Render
 	renderSeedOutput(wc, results, postScan, preExisted, writtenSet, cfg, configPaths)
 	return nil
+}
+
+// handleOpenClawSeed performs the smart OpenClaw detection, confirmation, and merge flow.
+func handleOpenClawSeed(targetDir string, autoYes bool) ([]seed.Result, error) {
+	detection := seed.DetectOpenClaw()
+
+	// Load template content
+	templateContent, err := seed.GetTemplateContent("templates/.openclaw/AGENTS.md")
+	if err != nil {
+		return nil, fmt.Errorf("read openclaw template: %w", err)
+	}
+
+	var destPath string
+
+	if detection.Installed {
+		// OpenClaw is installed — use detected state dir
+		defaultDest := filepath.Join(detection.StateDir, "AGENTS.md")
+
+		if autoYes || !isInteractive() {
+			// Auto-confirm
+			fmt.Fprintf(os.Stderr, "\n  OpenClaw detected at: %s (auto-confirmed)\n\n", detection.StateDir)
+			destPath = defaultDest
+		} else {
+			// Interactive confirmation
+			destPath = promptOpenClawPath(detection, defaultDest)
+			if destPath == "" {
+				// User cancelled
+				return []seed.Result{{Path: defaultDest, Status: "cancelled"}}, nil
+			}
+		}
+	} else {
+		// OpenClaw not installed — fall back to cwd-relative
+		fallbackDest := filepath.Join(targetDir, ".openclaw", "AGENTS.md")
+
+		if autoYes || !isInteractive() {
+			destPath = fallbackDest
+		} else {
+			fmt.Fprintf(os.Stderr, "\n  OpenClaw state directory not found.\n")
+			fmt.Fprintf(os.Stderr, "  Will create: %s\n", fallbackDest)
+			fmt.Fprintf(os.Stderr, "  Continue? [Y/n]: ")
+
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+
+			if response == "n" || response == "no" {
+				return []seed.Result{{Path: fallbackDest, Status: "cancelled"}}, nil
+			}
+			destPath = fallbackDest
+		}
+	}
+
+	result, err := seed.WriteOpenClawInstructions(destPath, templateContent)
+	if err != nil {
+		return nil, err
+	}
+
+	return []seed.Result{result}, nil
+}
+
+// promptOpenClawPath shows the detected OpenClaw path and lets the user confirm,
+// cancel, or type a custom path.
+func promptOpenClawPath(detection seed.OpenClawDetection, defaultDest string) string {
+	sourceLabel := detection.Source
+	switch {
+	case strings.HasPrefix(sourceLabel, "env:"):
+		sourceLabel = "environment variable " + sourceLabel[4:]
+	case sourceLabel == "default":
+		sourceLabel = "default"
+	case strings.HasPrefix(sourceLabel, "legacy:"):
+		sourceLabel = "legacy (" + sourceLabel[7:] + ")"
+	}
+
+	fmt.Fprintf(os.Stderr, "\n  OpenClaw detected (%s)\n", sourceLabel)
+	fmt.Fprintf(os.Stderr, "  State directory: %s\n\n", detection.StateDir)
+
+	candidates := seed.OpenClawSeedPaths(detection)
+	if len(candidates) > 1 {
+		fmt.Fprintf(os.Stderr, "  Candidate paths:\n")
+		for i, p := range candidates {
+			fmt.Fprintf(os.Stderr, "    %d. %s\n", i+1, p)
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
+	fmt.Fprintf(os.Stderr, "  Destination: %s\n", defaultDest)
+	fmt.Fprintf(os.Stderr, "  Confirm? [Y/n/custom path]: ")
+
+	var response string
+	fmt.Scanln(&response)
+	response = strings.TrimSpace(response)
+
+	if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
+		return defaultDest
+	}
+	if strings.ToLower(response) == "n" || strings.ToLower(response) == "no" {
+		return ""
+	}
+
+	// Custom path — if it's a directory, append AGENTS.md
+	customPath := response
+	if info, err := os.Stat(customPath); err == nil && info.IsDir() {
+		customPath = filepath.Join(customPath, "AGENTS.md")
+	} else if !strings.HasSuffix(strings.ToLower(customPath), ".md") {
+		customPath = filepath.Join(customPath, "AGENTS.md")
+	}
+
+	return customPath
 }
 
 func renderSeedOutput(
@@ -126,8 +261,22 @@ func renderSeedOutput(
 					sizeStr = seedFormatSize(info.Size())
 				}
 				fmt.Printf("    [+] %-40s %s\n", r.Path, sizeStr)
+			case "merged":
+				sizeStr := ""
+				if info, err := os.Stat(r.Path); err == nil {
+					sizeStr = seedFormatSize(info.Size())
+				}
+				fmt.Printf("    [~] %-40s %s (merged)\n", r.Path, sizeStr)
+			case "updated":
+				sizeStr := ""
+				if info, err := os.Stat(r.Path); err == nil {
+					sizeStr = seedFormatSize(info.Size())
+				}
+				fmt.Printf("    [~] %-40s %s (updated)\n", r.Path, sizeStr)
 			case "skipped":
 				fmt.Printf("    [=] %-40s (exists, skipped)\n", r.Path)
+			case "cancelled":
+				fmt.Printf("    [-] %-40s (cancelled)\n", r.Path)
 			default:
 				fmt.Printf("    [?] %-40s %s\n", r.Path, r.Status)
 			}
