@@ -88,8 +88,9 @@
   - `sandbox: { enabled: true, mode: always, enable_cache: true }`
 
 ## Setup helpers
-- Local install (no sudo): `INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
-- Ensure `~/.local/bin` is on `PATH`
+- **macOS/Linux** install (no sudo): `curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
+- **Windows** install (PowerShell, no admin): `irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex`
+- Ensure install dir is on `PATH`
 - `vectra-guard init --local`
 - `vectra-guard sandbox deps install`
 - `vectra-guard roadmap add --title "..." --summary "..." --tags "agent,plan"`

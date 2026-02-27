@@ -75,6 +75,14 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 ```
 
+**Windows (Docker Desktop)**
+```powershell
+# Install Docker Desktop for Windows from https://www.docker.com/products/docker-desktop
+# Or via winget:
+winget install Docker.DockerDesktop
+```
+> **Note:** On Windows, the Docker runtime is the primary sandbox backend. Bubblewrap and Linux namespace runtimes are not available. Ensure Docker Desktop is running before using sandbox features.
+
 **Install via Vectra Guard**
 ```bash
 # After installing vectra-guard

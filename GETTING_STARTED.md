@@ -14,9 +14,9 @@ After following this guide (critical outcomes first):
 - ✅ Secret and code scanning before deploy (`scan-secrets`, `scan-security`)
 - ✅ Optional agent helpers: context summaries + roadmap planning
 
-**Supported platforms:** macOS and Debian Linux (x86_64, arm64).
+**Supported platforms:** macOS, Linux, and Windows (x86_64, arm64).
 
-**Prerequisites:** `git` and `go` (install via Homebrew on macOS or apt on Debian/Ubuntu).
+**Prerequisites:** `curl` or `wget` (macOS/Linux) / PowerShell 5.1+ (Windows). Build from source requires `git` and `go`.
 
 ---
 
@@ -24,26 +24,35 @@ After following this guide (critical outcomes first):
 
 ### Step 1: Install Vectra Guard
 
-**Recommended – one command:**
+**macOS & Linux (one command):**
 
 ```bash
-# Downloads the latest release binary and installs locally
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
 The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin` is on `PATH`.
 
-**One-line uninstall:**
+**Windows (PowerShell, one command):**
+
+```powershell
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
+```
+
+Installs to `%LOCALAPPDATA%\VectraGuard` (no admin required). Sets up `vg` alias automatically.
+
+For CI / non-interactive Windows installs, set `$env:VECTRAGUARD_YES = '1'` before running.
+
+**One-line uninstall (macOS/Linux):**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
 ```
 
-**Prereqs:** `curl` or `wget` must be installed.
+**Prereqs:** `curl` or `wget` (macOS/Linux) / PowerShell 5.1+ (Windows).
 
 For alternative installation methods (Go install, build from source), see the **Installation Options** section in `README.md`.
 
-**One-command full setup (deps + tool):**
+**One-command full setup — macOS/Linux (deps + tool):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
 ```
