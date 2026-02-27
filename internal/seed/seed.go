@@ -64,8 +64,8 @@ func AvailableTargets() map[string]Target {
 		},
 		"openclaw": {
 			Key:      "openclaw",
-			DestPath: ".openclaw/plugins/vectraguard.yaml",
-			SrcPath:  "templates/.openclaw/plugins/vectraguard.yaml",
+			DestPath: ".openclaw/AGENTS.md",
+			SrcPath:  "templates/.openclaw/AGENTS.md",
 		},
 	}
 }
