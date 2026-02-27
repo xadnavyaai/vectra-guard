@@ -11,7 +11,7 @@ import (
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 )
 
-func runInit(ctx context.Context, force bool, tomlFormat bool, local bool) error {
+func runInit(ctx context.Context, force bool, tomlFormat bool, local bool, global bool) error {
 	logger := logging.FromContext(ctx)
 	cfg := config.DefaultConfig()
 	cfg.Policies.Allowlist = []string{"echo \"safe\"", "touch /tmp/ok"}
@@ -21,10 +21,11 @@ func runInit(ctx context.Context, force bool, tomlFormat bool, local bool) error
 	if err != nil {
 		return fmt.Errorf("resolve cwd: %w", err)
 	}
-	target := filepath.Join(workdir, "vectra-guard.yaml")
-	if tomlFormat {
-		target = filepath.Join(workdir, "vectra-guard.toml")
-	}
+
+	// Default to global when neither --local nor --global is specified
+	useGlobal := global || !local
+
+	var target string
 	if local {
 		target = filepath.Join(workdir, ".vectra-guard", "config.yaml")
 		if tomlFormat {
@@ -38,6 +39,24 @@ func runInit(ctx context.Context, force bool, tomlFormat bool, local bool) error
 		}
 		if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 			return fmt.Errorf("create local cache directory: %w", err)
+		}
+	} else if useGlobal {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("resolve home directory: %w", err)
+		}
+		configDir := filepath.Join(home, ".config", "vectra-guard")
+		target = filepath.Join(configDir, "config.yaml")
+		if tomlFormat {
+			target = filepath.Join(configDir, "config.toml")
+		}
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
+			return fmt.Errorf("create global config directory: %w", err)
+		}
+	} else {
+		target = filepath.Join(workdir, "vectra-guard.yaml")
+		if tomlFormat {
+			target = filepath.Join(workdir, "vectra-guard.toml")
 		}
 	}
 
