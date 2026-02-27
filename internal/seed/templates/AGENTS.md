@@ -72,9 +72,9 @@ Use these guidelines for agentic coding tools and IDE assistants.
   - Ensure `~/.local/bin` is on `PATH`
 - **Windows** — install via PowerShell (no admin):
   - `irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex`
-- Initialize a repo-local config and cache:
-  - `vectra-guard init --local`
-- Default config file: `vectra-guard.yaml` (or `.vectra-guard/config.yaml` for local mode).
+- Initialize global config: `vectra-guard init` (writes to `~/.config/vectra-guard/config.yaml`)
+- Initialize repo-local config: `vectra-guard init --local` (writes to `.vectra-guard/config.yaml`)
+- Config loading order: global → project → local (later files override).
 
 ## Security Practices (Lightweight)
 - Prefer user-space installs and avoid `sudo`.

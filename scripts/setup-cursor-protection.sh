@@ -228,11 +228,11 @@ echo ""
 
 echo "Step 5/6: Initializing vectra-guard configuration..."
 echo "--------------------------------------"
-if [ ! -f "$WORKSPACE/vectra-guard.yaml" ]; then
+if [ ! -f ~/.config/vectra-guard/config.yaml ] && [ ! -f "$WORKSPACE/vectra-guard.yaml" ]; then
     vectra-guard init
-    echo "✅ Created vectra-guard.yaml"
+    echo "✅ Created ~/.config/vectra-guard/config.yaml"
 else
-    echo "ℹ️  vectra-guard.yaml already exists, skipping"
+    echo "ℹ️  Config already exists, skipping"
 fi
 echo ""
 

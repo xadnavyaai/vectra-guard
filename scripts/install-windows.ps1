@@ -327,8 +327,8 @@ Write-Host ''
 Write-Host '    2. Execute commands safely:'
 Write-Host '       vg exec -- npm install' -ForegroundColor Yellow
 Write-Host ''
-Write-Host '    3. Initialize config:'
-Write-Host '       vectra-guard init' -ForegroundColor Yellow
+Write-Host '    3. Initialize global config:'
+Write-Host '       vectra-guard init    # creates ~\.config\vectra-guard\config.yaml' -ForegroundColor Yellow
 Write-Host ''
 Write-Host '    4. CVE scan dependencies:'
 Write-Host '       vg cve sync --path . && vg cve scan --path .' -ForegroundColor Yellow

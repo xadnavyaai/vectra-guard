@@ -316,10 +316,10 @@ Do you want to proceed? [y/N]:
 **Share protection with your team**:
 
 ```bash
-# In your project directory
-vectra-guard init
+# Create a repo-local config for team sharing
+vectra-guard init --local
 
-# Edit vectra-guard.yaml with team policies
+# Edit .vectra-guard/config.yaml with team policies
 # Example:
 ```
 
@@ -336,7 +336,7 @@ policies:
 
 ```bash
 # Commit to git
-git add vectra-guard.yaml
+git add .vectra-guard/config.yaml
 git commit -m "Add security policies"
 git push
 
@@ -349,7 +349,7 @@ git push
 
 ### Configure Policies
 
-**Edit** `vectra-guard.yaml` in your project or `~/.config/vectra-guard/config.yaml`.
+**Edit** `~/.config/vectra-guard/config.yaml` (global, created by `vg init`) or `.vectra-guard/config.yaml` (repo-local, created by `vg init --local`).
 
 **Quick Start Preset:**
 ```yaml
@@ -581,7 +581,7 @@ policies:
 ```bash
 # Each project can have its own policies
 cd ~/project-a
-vectra-guard init  # Creates vectra-guard.yaml
+vectra-guard init  # Creates ~/.config/vectra-guard/config.yaml
 
 # Different policies for different projects
 ```

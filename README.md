@@ -199,10 +199,10 @@ rm -rf ~/.vectra-guard  # Optional: removes all data
 Use Vectra Guard commands directly:
 
 ```bash
-# Initialize configuration
+# Initialize global config (~/.config/vectra-guard/config.yaml)
 vectra-guard init
 
-# Initialize repo-local config + cache
+# Initialize repo-local config + cache (.vectra-guard/config.yaml)
 vectra-guard init --local
 
 # Validate a script
@@ -877,7 +877,7 @@ Last Updated: 2024-12-24T15:45:00Z
 
 ## ⚙️ Configuration
 
-Create `vectra-guard.yaml` in your project or `~/.config/vectra-guard/config.yaml`.
+Run `vectra-guard init` to create `~/.config/vectra-guard/config.yaml` (global), or `vectra-guard init --local` for repo-scoped config.
 
 We recommend using one of the **Quick Start Presets** (Developer, CI/CD, or Production) found in [CONFIGURATION.md](CONFIGURATION.md#quick-start-presets).
 

@@ -84,7 +84,7 @@
 - **macOS/Linux** install (no sudo): `curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
 - **Windows** install (PowerShell, no admin): `irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex`
 - Ensure install dir is on `PATH`
-- `vectra-guard init --local`
+- `vectra-guard init` (global config) or `vectra-guard init --local` (repo-scoped)
 - `vectra-guard sandbox deps install`
 - `vectra-guard exec -- <command>`
 - `vectra-guard roadmap add --title "..." --summary "..." --tags "agent,plan"`

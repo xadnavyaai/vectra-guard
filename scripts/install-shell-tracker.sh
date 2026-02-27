@@ -314,14 +314,14 @@ echo ""
 
 # Initialize configuration
 echo "Step 3/5: Initializing vectra-guard..."
-if [ ! -f vectra-guard.yaml ] && [ ! -f ~/.config/vectra-guard/config.yaml ]; then
+if [ ! -f ~/.config/vectra-guard/config.yaml ] && [ ! -f vectra-guard.yaml ]; then
     if vectra-guard init &>/dev/null; then
-        echo "  ✅ Created vectra-guard.yaml"
+        echo "  ✅ Created ~/.config/vectra-guard/config.yaml"
     else
         echo "  ℹ️  Config initialization skipped (optional)"
     fi
 else
-    echo "  ℹ️  vectra-guard.yaml already exists"
+    echo "  ℹ️  Config already exists"
 fi
 echo ""
 
