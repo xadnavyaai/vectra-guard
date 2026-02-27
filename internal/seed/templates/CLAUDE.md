@@ -82,15 +82,18 @@
 - **Important**: Critical deletions (like `rm -rf /`) are still blocked. Soft delete only applies to safe deletions.
 
 ## Config & Sandbox
-- Config lives in `vectra-guard.yaml` (or `.vectra-guard/config.yaml` with `--local`).
+- Global config: `~/.config/vectra-guard/config.yaml` (created by `vg init`, the default).
+- Repo-local config: `.vectra-guard/config.yaml` (created by `vg init --local`).
+- Config loading order: global → project → local (later files override).
 - Sandbox is enabled by default. Prefer `mode: always` for risky commands.
 - Cache-optimized sandbox:
   - `sandbox: { enabled: true, mode: always, enable_cache: true }`
 
 ## Setup helpers
-- Local install (no sudo): `INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
-- Ensure `~/.local/bin` is on `PATH`
-- `vectra-guard init --local`
+- **macOS/Linux** install (no sudo): `curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
+- **Windows** install (PowerShell, no admin): `irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex`
+- Ensure install dir is on `PATH`
+- `vectra-guard init` (global config) or `vectra-guard init --local` (repo-scoped)
 - `vectra-guard sandbox deps install`
 - `vectra-guard roadmap add --title "..." --summary "..." --tags "agent,plan"`
 

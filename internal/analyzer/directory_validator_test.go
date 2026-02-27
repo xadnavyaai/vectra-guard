@@ -236,6 +236,54 @@ func TestValidateProtectedDirectory(t *testing.T) {
 			expectedDir:    "",
 		},
 
+		// Windows path tests (backslash)
+		{
+			name:           "rm -rf C:\\Windows (backslash)",
+			command:        `rm -rf C:\Windows`,
+			protectedDirs:  []string{`C:\Windows`, `C:\Program Files`},
+			expectedResult: true,
+			expectedDir:    `c:\windows`,
+		},
+		{
+			name:           "rm -rf C:\\Windows\\System32 (backslash subdir)",
+			command:        `rm -rf C:\Windows\System32`,
+			protectedDirs:  []string{`C:\Windows`, `C:\Program Files`},
+			expectedResult: true,
+			expectedDir:    `c:\windows`,
+		},
+		{
+			name:           "rm -rf C:\\Program Files (backslash)",
+			command:        `rm -rf C:\Program Files`,
+			protectedDirs:  []string{`C:\Windows`, `C:\Program Files`},
+			expectedResult: true,
+			expectedDir:    `c:\program files`,
+		},
+
+		// Windows path tests (forward slash)
+		{
+			name:           "rm -rf C:/Windows (forward slash)",
+			command:        "rm -rf C:/Windows",
+			protectedDirs:  []string{`C:\Windows`, `C:\Program Files`},
+			expectedResult: true,
+			expectedDir:    `c:\windows`,
+		},
+		{
+			name:           "rm -rf c:/windows (lowercase)",
+			command:        "rm -rf c:/windows",
+			protectedDirs:  []string{`C:\Windows`},
+			expectedResult: true,
+			expectedDir:    `c:\windows`,
+		},
+
+		// Windows safe path (not protected)
+		{
+			name:           "rm -rf C:\\Users\\vikas\\tmp (safe Windows path)",
+			command:        `rm -rf C:\Users\vikas\tmp`,
+			protectedDirs:  []string{`C:\Windows`, `C:\Program Files`},
+			expectedResult: false,
+			expectedDir:    "",
+		},
+
 		// Edge cases
 		{
 			name:           "rm -rf '/etc'",
@@ -378,6 +426,38 @@ func TestIsProtectedDirectory(t *testing.T) {
 			name:           "empty protected dirs",
 			path:           "/etc",
 			protectedDirs:  []string{},
+			expectedResult: false,
+		},
+
+		// Windows path tests
+		{
+			name:           "Windows exact match C:\\Windows",
+			path:           `C:\Windows`,
+			protectedDirs:  []string{`C:\Windows`, `C:\Program Files`},
+			expectedResult: true,
+		},
+		{
+			name:           "Windows subdirectory C:\\Windows\\System32",
+			path:           `C:\Windows\System32`,
+			protectedDirs:  []string{`C:\Windows`},
+			expectedResult: true,
+		},
+		{
+			name:           "Windows forward slash C:/Windows",
+			path:           "C:/Windows",
+			protectedDirs:  []string{`C:\Windows`},
+			expectedResult: true,
+		},
+		{
+			name:           "Windows case insensitive",
+			path:           `c:\windows`,
+			protectedDirs:  []string{`C:\Windows`},
+			expectedResult: true,
+		},
+		{
+			name:           "Windows safe path",
+			path:           `C:\Users\vikas\Documents`,
+			protectedDirs:  []string{`C:\Windows`, `C:\Program Files`},
 			expectedResult: false,
 		},
 	}

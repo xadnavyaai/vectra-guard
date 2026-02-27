@@ -87,10 +87,11 @@ func execute(args []string) error {
 		force := subFlags.Bool("force", false, "Overwrite existing config file")
 		asTOML := subFlags.Bool("toml", false, "Write config as TOML instead of YAML")
 		local := subFlags.Bool("local", false, "Write config under .vectra-guard/ with repo-local cache")
+		global := subFlags.Bool("global", false, "Write config under ~/.config/vectra-guard/ (default)")
 		if err := subFlags.Parse(subArgs); err != nil {
 			return err
 		}
-		return runInit(ctx, *force, *asTOML, *local)
+		return runInit(ctx, *force, *asTOML, *local, *global)
 	case "validate":
 		subFlags := flag.NewFlagSet("validate", flag.ContinueOnError)
 		if err := subFlags.Parse(subArgs); err != nil {

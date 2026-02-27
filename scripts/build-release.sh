@@ -19,6 +19,8 @@ PLATFORMS=(
     "darwin/arm64"
     "linux/amd64"
     "linux/arm64"
+    "windows/amd64"
+    "windows/arm64"
 )
 
 echo "Building for platforms:"
@@ -69,6 +71,8 @@ echo "      • vectra-guard-darwin-amd64"
 echo "      • vectra-guard-darwin-arm64"
 echo "      • vectra-guard-linux-amd64"
 echo "      • vectra-guard-linux-arm64"
+echo "      • vectra-guard-windows-amd64.exe"
+echo "      • vectra-guard-windows-arm64.exe"
 echo "      • checksums.txt"
 echo "   3. Publish release"
 echo ""

@@ -141,9 +141,10 @@ If you run `npm install`:
 
 Vectra Guard looks for configuration in the following order (last one wins):
 
-1. **User config**: `~/.config/vectra-guard/config.yaml`
+1. **Global config**: `~/.config/vectra-guard/config.yaml` (created by `vg init`)
 2. **Project config**: `./vectra-guard.yaml` (in project root)
-3. **Explicit path**: Via `--config` flag
+3. **Repo-local config**: `./.vectra-guard/config.yaml` (created by `vg init --local`)
+4. **Explicit path**: Via `--config` flag
 
 ```bash
 # Use project config

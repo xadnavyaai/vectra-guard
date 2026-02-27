@@ -63,11 +63,14 @@ Roadmaps are stored per workspace under ~/.vectra-guard/roadmaps.
 	case "init":
 		return printHelp(`Initialization:
 
-  vg init            # writes vectra-guard.yaml in repo root
-  vg init --toml     # writes vectra-guard.toml
-  vg init --local    # writes .vectra-guard/config.yaml and sets cache_dir
+  vg init            # writes ~/.config/vectra-guard/config.yaml (global, default)
+  vg init --local    # writes .vectra-guard/config.yaml in cwd (repo-scoped)
+  vg init --toml     # writes config as TOML instead of YAML
+  vg init --force    # overwrite existing config
 
+Global init (default) writes to ~/.config/vectra-guard/config.yaml.
 Local init creates a repo-scoped cache directory at .vectra-guard/cache.
+Config is loaded in order: global -> project -> local (later files override).
 `)
 	case "sandbox":
 		return printHelp(`Sandbox dependencies:

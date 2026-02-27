@@ -5,8 +5,8 @@
 - Do not suggest destructive commands (e.g., `rm -rf /`, `mkfs`, `dd if=`). These are blocked and unsafe.
 
 ## Configuration
-- Default config: `vectra-guard.yaml` at repo root.
-- Repo-local config: `.vectra-guard/config.yaml` created via `vectra-guard init --local`.
+- Global config: `~/.config/vectra-guard/config.yaml` (created by `vectra-guard init`, the default).
+- Repo-local config: `.vectra-guard/config.yaml` (created by `vectra-guard init --local`).
 
 ## Sandboxing
 - Default sandboxing is enabled. Use `auto` or `always` modes.

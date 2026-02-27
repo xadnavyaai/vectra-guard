@@ -219,18 +219,18 @@ func (s *Server) handleCVE(w http.ResponseWriter, r *http.Request) {
 }
 
 type cveSummary struct {
-	TotalPackages int                `json:"total_packages"`
-	TotalVulns    int                `json:"total_vulns"`
-	BySeverity    map[string]int     `json:"by_severity"`
-	Entries       []cvePackageEntry  `json:"entries"`
-	UpdatedAt     time.Time          `json:"updated_at"`
+	TotalPackages int               `json:"total_packages"`
+	TotalVulns    int               `json:"total_vulns"`
+	BySeverity    map[string]int    `json:"by_severity"`
+	Entries       []cvePackageEntry `json:"entries"`
+	UpdatedAt     time.Time         `json:"updated_at"`
 }
 
 type cvePackageEntry struct {
-	Ecosystem       string              `json:"ecosystem"`
-	Name            string              `json:"name"`
-	Version         string              `json:"version"`
-	Vulnerabilities []cveVulnEntry      `json:"vulnerabilities"`
+	Ecosystem       string         `json:"ecosystem"`
+	Name            string         `json:"name"`
+	Version         string         `json:"version"`
+	Vulnerabilities []cveVulnEntry `json:"vulnerabilities"`
 }
 
 type cveVulnEntry struct {
@@ -276,13 +276,13 @@ func buildCVESummary(store *cve.Store) cveSummary {
 }
 
 type statusResponse struct {
-	Version    string            `json:"version"`
-	GuardLevel string            `json:"guard_level"`
-	Sandbox    statusSandbox     `json:"sandbox"`
-	Features   map[string]bool   `json:"features"`
-	DataDir    string            `json:"data_dir"`
-	Uptime     string            `json:"uptime"`
-	StartedAt  time.Time         `json:"started_at"`
+	Version    string          `json:"version"`
+	GuardLevel string          `json:"guard_level"`
+	Sandbox    statusSandbox   `json:"sandbox"`
+	Features   map[string]bool `json:"features"`
+	DataDir    string          `json:"data_dir"`
+	Uptime     string          `json:"uptime"`
+	StartedAt  time.Time       `json:"started_at"`
 }
 
 type statusSandbox struct {
@@ -330,10 +330,10 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 // Agent coverage types
 type agentCoverageResponse struct {
-	Agents   []agentEntry        `json:"agents"`
-	Covered  int                 `json:"covered"`
-	Total    int                 `json:"total"`
-	OpenClaw *openClawInfo       `json:"openclaw,omitempty"`
+	Agents   []agentEntry  `json:"agents"`
+	Covered  int           `json:"covered"`
+	Total    int           `json:"total"`
+	OpenClaw *openClawInfo `json:"openclaw,omitempty"`
 }
 
 type agentEntry struct {
@@ -349,7 +349,7 @@ type openClawInfo struct {
 	Installed    bool     `json:"installed"`
 	StateDir     string   `json:"state_dir"`
 	Source       string   `json:"source"`
-	ConfigExists bool    `json:"config_exists"`
+	ConfigExists bool     `json:"config_exists"`
 	AgentDirs    []string `json:"agent_dirs,omitempty"`
 	SeedPaths    []string `json:"seed_paths,omitempty"`
 }

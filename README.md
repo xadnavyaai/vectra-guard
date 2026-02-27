@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Debian%20Linux%20(x86%2FARM)-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(x86%2FARM)-lightgrey.svg)]()
 [![CI Status](https://github.com/xadnavyaai/vectra-guard/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/xadnavyaai/vectra-guard/actions)
 
 **Contents:** [Why Vectra Guard](#-why-vectra-guard) · [Quick Start](#-quick-start) · [Features](#-features-by-impact) · [More features](#-more-features) · [Installation](#-installation) · [Usage](#-usage) · [Sandbox](#-complete-sandbox-guide) · [Configuration](#️-configuration)
@@ -76,7 +76,7 @@ vectra-guard audit session
 vectra-guard cve sync --path . && vectra-guard cve scan --path .
 ```
 
-**That's it!** The tool protects 30+ system directories across Debian Linux and macOS, and detects 200+ risky patterns automatically. **All commands run in sandbox by default** with intelligent caching for maximum security and performance.
+**That's it!** The tool protects 30+ system directories across macOS, Linux, and Windows, and detects 200+ risky patterns automatically. **All commands run in sandbox by default** with intelligent caching for maximum security and performance.
 
 For more features (trust store, context, roadmap, explain, seed agents, etc.) see [More features](#-more-features) and [FEATURES.md](FEATURES.md).
 
@@ -146,15 +146,23 @@ vectra-guard scan-security --path . --languages go,python,c,config
 
 ## 📦 Installation
 
-### Recommended (one line, macOS & Debian Linux)
+### Recommended (one line)
+
+**macOS & Linux:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-- **Platform**: macOS & Debian Linux (x86_64, arm64)  
-- **What it does**: downloads latest release → installs to `~/.local/bin` → makes `vectra-guard` available
-- **Prereqs**: `curl` or `wget` is required
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
+```
+
+- **Platform**: macOS, Linux, Windows (x86_64, arm64)
+- **What it does**: downloads latest release → installs to user-space → makes `vectra-guard` (and `vg` alias) available
+- **Prereqs**: `curl` or `wget` (Unix) / PowerShell 5.1+ (Windows)
 
 ### One-command full setup (deps + tool)
 
@@ -191,10 +199,10 @@ rm -rf ~/.vectra-guard  # Optional: removes all data
 Use Vectra Guard commands directly:
 
 ```bash
-# Initialize configuration
+# Initialize global config (~/.config/vectra-guard/config.yaml)
 vectra-guard init
 
-# Initialize repo-local config + cache
+# Initialize repo-local config + cache (.vectra-guard/config.yaml)
 vectra-guard init --local
 
 # Validate a script
@@ -869,7 +877,7 @@ Last Updated: 2024-12-24T15:45:00Z
 
 ## ⚙️ Configuration
 
-Create `vectra-guard.yaml` in your project or `~/.config/vectra-guard/config.yaml`.
+Run `vectra-guard init` to create `~/.config/vectra-guard/config.yaml` (global), or `vectra-guard init --local` for repo-scoped config.
 
 We recommend using one of the **Quick Start Presets** (Developer, CI/CD, or Production) found in [CONFIGURATION.md](CONFIGURATION.md#quick-start-presets).
 

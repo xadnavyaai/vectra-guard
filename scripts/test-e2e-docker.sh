@@ -118,10 +118,10 @@ test_initialization() {
     cd "$TEST_WORKSPACE" || return 1
     
     test_command "Initialize config" "$VECTRA_BINARY init" 0
-    [ -f "vectra-guard.yaml" ] && print_success "Config file created" || print_failure "Config file not created"
+    [ -f "$HOME/.config/vectra-guard/config.yaml" ] && print_success "Config file created" || print_failure "Config file not created"
     test_command "Initialize with --force" "$VECTRA_BINARY init --force" 0
     test_command "Initialize as TOML" "$VECTRA_BINARY init --toml --force" 0
-    [ -f "vectra-guard.toml" ] && print_success "TOML config created" || print_failure "TOML config not created"
+    [ -f "$HOME/.config/vectra-guard/config.toml" ] && print_success "TOML config created" || print_failure "TOML config not created"
 }
 
 test_validation() {

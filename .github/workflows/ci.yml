@@ -123,8 +123,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -134,7 +134,8 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Cache Go modules
+      - name: Cache Go modules (Unix)
+        if: runner.os != 'Windows'
         uses: actions/cache@v4
         with:
           path: |
@@ -144,8 +145,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Build for ${{ matrix.os }}
+      - name: Cache Go modules (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\go-build
+            ~\go\pkg\mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
         run: make build
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: go build -o vectra-guard.exe .
 
       - name: Run basic unit tests
         run: go test -v ./...

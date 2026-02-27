@@ -935,6 +935,126 @@ func TestOperationalDestructionDetection(t *testing.T) {
 	}
 }
 
+// TestWindowsSystemDirectoryDeletion tests detection of dangerous Windows system directory deletion
+func TestWindowsSystemDirectoryDeletion(t *testing.T) {
+	tests := []struct {
+		name             string
+		script           string
+		shouldDetect     bool
+		expectedCode     string
+		expectedSeverity string
+	}{
+		// Windows backslash paths
+		{
+			name:             `rm -rf C:\Windows (backslash)`,
+			script:           `rm -rf C:\Windows`,
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             `rm -rf C:\Windows\System32 (backslash)`,
+			script:           `rm -rf C:\Windows\System32`,
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             `rm -rf C:\Program Files (backslash)`,
+			script:           `rm -rf C:\Program Files`,
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             `rm -rf C:\Users (backslash)`,
+			script:           `rm -rf C:\Users`,
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             `rm -rf C:\ (drive root backslash)`,
+			script:           `rm -rf C:\`,
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+
+		// Windows forward slash paths
+		{
+			name:             "rm -rf C:/Windows (forward slash)",
+			script:           "rm -rf C:/Windows",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             "rm -rf c:/windows (lowercase)",
+			script:           "rm -rf c:/windows",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             "rm -rf C:/Program Files (forward slash)",
+			script:           "rm -rf C:/Program Files",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             "rm -rf C:/ (drive root forward slash)",
+			script:           "rm -rf C:/",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+
+		// Without force flag
+		{
+			name:             `rm -r C:\Windows (no force)`,
+			script:           `rm -r C:\Windows`,
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
+			expectedSeverity: "critical",
+		},
+
+		// Safe Windows paths (should not trigger)
+		{
+			name:             `rm -rf C:\Users\vikas\tmp (safe user dir)`,
+			script:           `rm -rf C:\Users\vikas\tmp`,
+			shouldDetect:     false,
+			expectedCode:     "",
+			expectedSeverity: "",
+		},
+	}
+
+	policy := config.PolicyConfig{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
+
+			found := false
+			for _, f := range findings {
+				if f.Code == tt.expectedCode {
+					found = true
+					if f.Severity != tt.expectedSeverity {
+						t.Errorf("expected severity %s, got %s", tt.expectedSeverity, f.Severity)
+					}
+					break
+				}
+			}
+
+			if found != tt.shouldDetect {
+				t.Errorf("expected detection=%v, got=%v for script: %s",
+					tt.shouldDetect, found, tt.script)
+			}
+		})
+	}
+}
+
 func TestPythonCommandExtraction(t *testing.T) {
 	tests := []struct {
 		name         string

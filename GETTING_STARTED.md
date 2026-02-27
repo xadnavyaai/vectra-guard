@@ -14,9 +14,9 @@ After following this guide (critical outcomes first):
 - ✅ Secret and code scanning before deploy (`scan-secrets`, `scan-security`)
 - ✅ Optional agent helpers: context summaries + roadmap planning
 
-**Supported platforms:** macOS and Debian Linux (x86_64, arm64).
+**Supported platforms:** macOS, Linux, and Windows (x86_64, arm64).
 
-**Prerequisites:** `git` and `go` (install via Homebrew on macOS or apt on Debian/Ubuntu).
+**Prerequisites:** `curl` or `wget` (macOS/Linux) / PowerShell 5.1+ (Windows). Build from source requires `git` and `go`.
 
 ---
 
@@ -24,26 +24,35 @@ After following this guide (critical outcomes first):
 
 ### Step 1: Install Vectra Guard
 
-**Recommended – one command:**
+**macOS & Linux (one command):**
 
 ```bash
-# Downloads the latest release binary and installs locally
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
 The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin` is on `PATH`.
 
-**One-line uninstall:**
+**Windows (PowerShell, one command):**
+
+```powershell
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
+```
+
+Installs to `%LOCALAPPDATA%\VectraGuard` (no admin required). Sets up `vg` alias automatically.
+
+For CI / non-interactive Windows installs, set `$env:VECTRAGUARD_YES = '1'` before running.
+
+**One-line uninstall (macOS/Linux):**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
 ```
 
-**Prereqs:** `curl` or `wget` must be installed.
+**Prereqs:** `curl` or `wget` (macOS/Linux) / PowerShell 5.1+ (Windows).
 
 For alternative installation methods (Go install, build from source), see the **Installation Options** section in `README.md`.
 
-**One-command full setup (deps + tool):**
+**One-command full setup — macOS/Linux (deps + tool):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
 ```
@@ -307,10 +316,10 @@ Do you want to proceed? [y/N]:
 **Share protection with your team**:
 
 ```bash
-# In your project directory
-vectra-guard init
+# Create a repo-local config for team sharing
+vectra-guard init --local
 
-# Edit vectra-guard.yaml with team policies
+# Edit .vectra-guard/config.yaml with team policies
 # Example:
 ```
 
@@ -327,7 +336,7 @@ policies:
 
 ```bash
 # Commit to git
-git add vectra-guard.yaml
+git add .vectra-guard/config.yaml
 git commit -m "Add security policies"
 git push
 
@@ -340,7 +349,7 @@ git push
 
 ### Configure Policies
 
-**Edit** `vectra-guard.yaml` in your project or `~/.config/vectra-guard/config.yaml`.
+**Edit** `~/.config/vectra-guard/config.yaml` (global, created by `vg init`) or `.vectra-guard/config.yaml` (repo-local, created by `vg init --local`).
 
 **Quick Start Preset:**
 ```yaml
@@ -572,7 +581,7 @@ policies:
 ```bash
 # Each project can have its own policies
 cd ~/project-a
-vectra-guard init  # Creates vectra-guard.yaml
+vectra-guard init  # Creates ~/.config/vectra-guard/config.yaml
 
 # Different policies for different projects
 ```

@@ -67,12 +67,14 @@ Use these guidelines for agentic coding tools and IDE assistants.
 - **Important**: Critical deletions (like `rm -rf /`) are still blocked. Soft delete only applies to safe deletions.
 
 ## Recommended Setup
-- Install locally (no sudo):
-  - `INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
+- **macOS/Linux** — install locally (no sudo):
+  - `curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
   - Ensure `~/.local/bin` is on `PATH`
-- Initialize a repo-local config and cache:
-  - `vectra-guard init --local`
-- Default config file: `vectra-guard.yaml` (or `.vectra-guard/config.yaml` for local mode).
+- **Windows** — install via PowerShell (no admin):
+  - `irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex`
+- Initialize global config: `vectra-guard init` (writes to `~/.config/vectra-guard/config.yaml`)
+- Initialize repo-local config: `vectra-guard init --local` (writes to `.vectra-guard/config.yaml`)
+- Config loading order: global → project → local (later files override).
 
 ## Security Practices (Lightweight)
 - Prefer user-space installs and avoid `sudo`.

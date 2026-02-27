@@ -433,8 +433,14 @@ vg context summarize code . --since HEAD~1
 
 ## 🛠 Install (30s)
 
+**macOS & Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
 ```
 
 **Verify installation**

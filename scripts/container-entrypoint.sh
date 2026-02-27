@@ -14,7 +14,7 @@ echo "Workspace: $WORKSPACE"
 echo ""
 
 # Initialize vectra-guard config if not exists
-if [ ! -f "$WORKSPACE/vectra-guard.yaml" ]; then
+if [ ! -f ~/.config/vectra-guard/config.yaml ] && [ ! -f "$WORKSPACE/vectra-guard.yaml" ]; then
     echo "📝 Initializing vectra-guard configuration..."
     vectra-guard init
 fi

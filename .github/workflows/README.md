@@ -22,7 +22,7 @@ This directory contains the CI/CD workflows for Vectra Guard. All workflows are 
   1. **Unit Tests**: All Go unit tests, internal tests, CVE tests
   2. **Build Verification**: Ensures binary builds successfully
   3. **Docker Tests**: Runs Docker-based integration tests
-  4. **Multi-platform Build**: Tests builds on Ubuntu and macOS
+  4. **Multi-platform Build**: Tests builds on Ubuntu, macOS, and Windows
   5. **Lint & Code Quality**: Formatting, vet, staticcheck
   6. **Test Coverage**: Generates coverage reports
 
@@ -30,7 +30,7 @@ This directory contains the CI/CD workflows for Vectra Guard. All workflows are 
 - **Trigger**: When a version tag is pushed (e.g., `v0.2.1`)
 - **Purpose**: Automated release creation
 - **Produces**:
-  - Multi-platform binaries (Linux/macOS, amd64/arm64)
+  - Multi-platform binaries (Linux/macOS/Windows, amd64/arm64)
   - SHA256 checksums for all binaries
   - GitHub Release with installation instructions
 - **Platforms**:
@@ -38,6 +38,8 @@ This directory contains the CI/CD workflows for Vectra Guard. All workflows are 
   - `linux-arm64`
   - `darwin-amd64` (Intel Mac)
   - `darwin-arm64` (Apple Silicon)
+  - `windows-amd64`
+  - `windows-arm64`
 
 ## 🚀 Workflow Execution Order
 
@@ -77,7 +79,7 @@ Main Branch Push
 Version Tag (v*.*.*)
 └── Release
     ├── Pre-release Tests
-    ├── Build Release Binaries (4 platforms)
+    ├── Build Release Binaries (6 platforms)
     ├── Create GitHub Release
     └── Update Homebrew (optional)
 ```
@@ -235,6 +237,6 @@ When contributing:
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: February 2026
 **Go Version**: 1.25.1
-**Supported Platforms**: Linux (amd64, arm64), macOS (amd64, arm64)
+**Supported Platforms**: Linux (amd64, arm64), macOS (amd64, arm64), Windows (amd64, arm64)
