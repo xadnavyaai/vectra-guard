@@ -87,13 +87,19 @@ vectra-guard scan-security --path . --languages go,python,c,config
 
 **That's it!** Vectra Guard is now protecting commands run with `vectra-guard exec`.
 
-### Optional: Agentic setup (Cursor/IDE)
+### Optional: Agentic setup (Cursor/IDE/OpenClaw)
 
 For agent workflows: seed agent instructions, install workflow examples. See [More features](#-more-features) and [README](README.md#-features-by-impact).
 
 ```bash
 # Seed agent instructions into the current repo
 vectra-guard seed agents --target . --targets "agents,cursor"
+
+# For OpenClaw users: seed the VectraGuard plugin config
+vectra-guard seed agents --target . --targets "openclaw"
+
+# Or seed everything at once
+vectra-guard seed agents --target . --targets "agents,claude,cursor,openclaw"
 ```
 
 ---
@@ -125,7 +131,7 @@ What you just did, ordered by impact:
 
 ## 🎯 More features
 
-Additional features that improve workflow, ordered by impact: **seed agents** (Cursor/IDE), **explain** (why a script is risky), **trust store**, **context summaries**, **roadmap planning**, **shell tracker** (logging only), **lockdown**, **prompt firewall**, **validate-agent**, **container mode**, **git pre-commit hook**, **IDE integration**. See [README](README.md#-more-features) or [FEATURES.md](FEATURES.md) for details.
+Additional features that improve workflow, ordered by impact: **seed agents** (Cursor/IDE/OpenClaw), **explain** (why a script is risky), **trust store**, **OpenClaw plugin** (runtime security for AI agents), **context summaries**, **roadmap planning**, **shell tracker** (logging only), **lockdown**, **prompt firewall**, **validate-agent**, **container mode**, **git pre-commit hook**, **IDE integration**. See [README](README.md#-more-features) or [FEATURES.md](FEATURES.md) for details.
 
 ---
 

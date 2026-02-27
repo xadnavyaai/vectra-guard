@@ -233,9 +233,35 @@ vg trust clean
 **Seed instructions for your IDE/agent**
 ```bash
 vg seed agents --target . --targets "agents,cursor"
-# ✅ Created .cursorrules
-# ✅ Created .agents/AGENTS.md
+# ✅ Created .cursor/rules/vectra-guard.md
+# ✅ Created AGENTS.md
 # Agent instructions seeded!
+```
+
+**Seed OpenClaw plugin config**
+```bash
+vg seed agents --target . --targets "openclaw"
+# ✅ Created .openclaw/plugins/vectraguard.yaml
+# OpenClaw VectraGuard plugin config seeded!
+```
+
+**Seed everything at once**
+```bash
+vg seed agents --target . --targets "agents,claude,cursor,openclaw"
+```
+
+**List all available targets**
+```bash
+vg seed agents --list
+# Available targets:
+# - agents
+# - claude
+# - codex
+# - copilot
+# - cursor
+# - openclaw
+# - vscode
+# - windsurf
 ```
 
 **What agents get:**
@@ -253,6 +279,65 @@ vg cve scan --path .
 
 # If no issues:
 vg exec -- npm install
+```
+
+---
+
+### 🔌 OpenClaw Integration
+
+VectraGuard integrates as a first-class OpenClaw plugin, adding runtime security to AI agent workflows.
+
+**Quick setup**
+```bash
+# 1. Seed the plugin config
+vg seed agents --target . --targets "openclaw"
+
+# 2. Install the plugin in your OpenClaw project
+pnpm add @openclaw/vectraguard
+
+# 3. Enable in OpenClaw config (the seeded file has all options)
+# Edit .openclaw/plugins/vectraguard.yaml
+```
+
+**What the plugin provides:**
+
+| Feature | Hook/Tool | What It Does |
+|---------|-----------|--------------|
+| **Command gate** | `before_tool_call` | Blocks dangerous shell commands before execution |
+| **Prompt firewall** | `llm_input` | Detects prompt injection attempts (observe-only) |
+| **CVE scan tool** | `vectraguard_cve_scan` | Agent can scan dependencies for vulnerabilities |
+| **Secret scan tool** | `vectraguard_secret_scan` | Agent can find exposed secrets (values redacted) |
+| **Seed agents tool** | `vectraguard_seed_agents` | Agent can seed instruction files into directories |
+| **Audit trail** | `after_tool_call` | Logs all shell tool executions |
+| **CVE sync service** | Background | Keeps CVE database updated (24h interval) |
+
+**Gateway RPC methods:**
+```bash
+# Check plugin status
+vectraguard.status  # → version, binary path, feature flags
+
+# Run a scan
+vectraguard.scan    # → CVE or secret scan results
+
+# Seed agent files
+vectraguard.seed    # → list targets or seed files
+
+# View config
+vectraguard.config  # → resolved plugin configuration
+```
+
+**How command gate works:**
+```
+Agent tries: rm -rf /important-data
+  → VectraGuard analyzes: critical risk
+  → Plugin returns: { block: true, blockReason: "..." }
+  → Command never executes
+
+Agent tries: npm install express
+  → VectraGuard analyzes: low risk
+  → Plugin allows through
+  → OpenClaw's own exec approval runs
+  → Command executes safely
 ```
 
 ---

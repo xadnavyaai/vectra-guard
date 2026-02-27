@@ -1,0 +1,78 @@
+# VectraGuard Plugin for OpenClaw
+# https://github.com/xadnavyaai/vectra-guard
+#
+# This plugin integrates VectraGuard's security features into OpenClaw:
+#   - Command gate: blocks dangerous shell commands before execution
+#   - Prompt firewall: detects prompt injection attempts (observe-only)
+#   - CVE scanning: scan project dependencies for known vulnerabilities
+#   - Secret detection: find exposed secrets without leaking values
+#   - Audit trail: log all shell tool executions
+#   - Seed agents: generate agent instruction files
+#
+# Prerequisites:
+#   Install vectra-guard CLI:
+#     curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+#
+# Install the plugin:
+#   cd your-openclaw-project
+#   pnpm add @openclaw/vectraguard
+#
+# Then add this configuration to your OpenClaw config:
+
+plugins:
+  vectraguard:
+    enabled: true
+
+    # Path to vectra-guard binary (leave empty for auto-detection from PATH)
+    binaryPath: ""
+
+    # Guard level: auto | strict | permissive
+    #   auto     - risk-based decisions (recommended)
+    #   strict   - block high and medium risk commands
+    #   permissive - only block critical/blocked commands
+    guardLevel: auto
+
+    # Command gate — intercepts shell tool calls and blocks dangerous commands
+    commandGate:
+      enabled: true
+      blockOnHigh: true       # Block high-risk commands (default: true)
+      blockOnMedium: false    # Block medium-risk commands (default: false)
+      timeoutMs: 5000         # Analysis timeout in milliseconds
+      # Tool names to intercept (default covers common shell tools)
+      # toolNames: [sh, bash, shell, execute, run_command, terminal, exec, system]
+
+    # Prompt firewall — detects prompt injection in LLM inputs (observe-only)
+    promptFirewall:
+      enabled: true
+      timeoutMs: 3000
+
+    # CVE scanning — on-demand vulnerability scanning via agent tool
+    cveScan:
+      enabled: true
+      autoSyncEnabled: true       # Background CVE database sync
+      syncIntervalMs: 86400000    # Sync interval: 24 hours
+      timeoutMs: 60000
+
+    # Secret detection — find exposed secrets in project files
+    secretScan:
+      enabled: true
+      timeoutMs: 30000
+
+    # Seed agents — generate agent instruction files for various tools
+    seedAgents:
+      enabled: true
+
+    # Audit trail — log all shell tool executions
+    auditTrail:
+      enabled: true
+
+# Gateway RPC methods available when plugin is active:
+#   vectraguard.status  — version info, binary path, feature flags
+#   vectraguard.scan    — run CVE or secret scan (params: type=cve|secrets, path)
+#   vectraguard.seed    — list or seed agent instruction files
+#   vectraguard.config  — view resolved plugin configuration
+#
+# Agent tools registered:
+#   vectraguard_cve_scan     — scan dependencies for known vulnerabilities
+#   vectraguard_secret_scan  — detect exposed secrets (values redacted)
+#   vectraguard_seed_agents  — seed agent instruction files into a directory

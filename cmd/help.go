@@ -86,6 +86,22 @@ or DRY_RUN=1 to preview commands.
 
 Defaults to seeding only AGENTS.md unless --targets is provided.
 Use --list to see available targets.
+
+Available targets:
+  agents    AGENTS.md (universal agent instructions)
+  claude    CLAUDE.md (Claude Code / Claude)
+  codex     CODEX.md (OpenAI Codex)
+  copilot   .github/copilot-instructions.md
+  cursor    .cursor/rules/vectra-guard.md
+  windsurf  .windsurf/rules.md
+  vscode    .vscode/vectra-guard.instructions.md
+  openclaw  .openclaw/plugins/vectraguard.yaml (OpenClaw plugin config)
+
+Examples:
+  vg seed agents --target . --targets "agents,claude"
+  vg seed agents --target . --targets "openclaw"
+  vg seed agents --target . --targets "agents,cursor,openclaw"
+  vg seed agents --force --targets "openclaw"   # Overwrite existing
 `)
 	case "audit":
 		return printHelp(`Package auditing:

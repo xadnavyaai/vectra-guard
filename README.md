@@ -248,7 +248,7 @@ high risk command blocked by guard level medium
 
 Additional features that improve workflow and convenience, ordered by impact. See [FEATURES.md](FEATURES.md) for detailed examples.
 
-- **Seed agents / Cursor integration** — Seed agent instructions into repos for Cursor, VS Code, Claude, Codex, Windsurf, Copilot. See FEATURES.md for `seed agents` and IDE tasks.
+- **Seed agents / IDE & platform integration** — Seed agent instructions into repos for Cursor, VS Code, Claude, Codex, Windsurf, Copilot, and OpenClaw. See FEATURES.md for `seed agents` and IDE tasks.
 - **Explain** — Human-friendly reasons why a script is risky: `vectra-guard explain risky-script.sh`.
 - **Trust store** — Approve and remember commands to skip sandbox; `vg trust add/list`.
 - **Context summaries & roadmap** — Code mapping and planning for agents: `vg context summarize`, `vg roadmap add/list`.
@@ -1057,7 +1057,24 @@ git pull
 # Shell tracker keeps an audit trail
 ```
 
-### 6. **Audit & Compliance**
+### 6. **OpenClaw Integration**
+Add runtime security to OpenClaw agents with the VectraGuard plugin:
+```bash
+# Seed OpenClaw plugin config into your project
+vg seed agents --target . --targets "openclaw"
+
+# Or seed multiple targets at once
+vg seed agents --target . --targets "agents,claude,openclaw"
+```
+
+The OpenClaw plugin provides:
+- **Command gate** — blocks dangerous shell commands before agent execution
+- **Prompt firewall** — detects prompt injection attempts (observe-only)
+- **CVE scanning** — on-demand vulnerability scanning via agent tool
+- **Secret detection** — finds exposed secrets without leaking values to the LLM
+- **Audit trail** — logs all shell tool executions
+
+### 7. **Audit & Compliance**
 Generate audit trails for security reviews:
 ```bash
 # Export session logs
@@ -1270,6 +1287,7 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 | **List trusted commands** | `vg trust list` |
 | **Trust a command** | `vg trust add "command"` |
 | **View metrics** | `vg metrics show` |
+| **Seed OpenClaw config** | `vg seed agents --targets "openclaw"` |
 | **Complete feature guide** | See [FEATURES.md](FEATURES.md) |
 | **Sandbox documentation** | See [SANDBOX.md](SANDBOX.md) |
 | **Config examples** | See [CONFIGURATION.md](CONFIGURATION.md) |
