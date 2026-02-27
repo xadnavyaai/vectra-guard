@@ -15,6 +15,7 @@ import (
 	"github.com/vectra-guard/vectra-guard/internal/cve"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 	"github.com/vectra-guard/vectra-guard/internal/sandbox"
+	"github.com/vectra-guard/vectra-guard/internal/seed"
 	"github.com/vectra-guard/vectra-guard/internal/session"
 )
 
@@ -33,6 +34,7 @@ type Server struct {
 	mux       *http.ServeMux
 	eventHub  *EventHub
 	startTime time.Time
+	workspace string
 }
 
 // New creates a new dashboard server bound to the given workspace.
@@ -58,6 +60,7 @@ func New(workspace string, logger *logging.Logger, cfg config.Config, trust *san
 		mux:       http.NewServeMux(),
 		eventHub:  hub,
 		startTime: time.Now(),
+		workspace: workspace,
 	}
 	s.routes()
 	return s, nil
@@ -77,6 +80,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/trust", s.handleTrust)
 	s.mux.HandleFunc("/api/cve", s.handleCVE)
 	s.mux.HandleFunc("/api/status", s.handleStatus)
+	s.mux.HandleFunc("/api/agents", s.handleAgents)
 	s.mux.HandleFunc("/api/events", s.handleEvents)
 }
 
@@ -322,6 +326,116 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	s.eventHub.ServeHTTP(w, r)
+}
+
+// Agent coverage types
+type agentCoverageResponse struct {
+	Agents   []agentEntry        `json:"agents"`
+	Covered  int                 `json:"covered"`
+	Total    int                 `json:"total"`
+	OpenClaw *openClawInfo       `json:"openclaw,omitempty"`
+}
+
+type agentEntry struct {
+	Key      string `json:"key"`
+	DestPath string `json:"dest_path"`
+	Exists   bool   `json:"exists"`
+	Size     int64  `json:"size"`
+	ModTime  string `json:"mod_time,omitempty"`
+	Age      string `json:"age,omitempty"`
+}
+
+type openClawInfo struct {
+	Installed    bool     `json:"installed"`
+	StateDir     string   `json:"state_dir"`
+	Source       string   `json:"source"`
+	ConfigExists bool    `json:"config_exists"`
+	AgentDirs    []string `json:"agent_dirs,omitempty"`
+	SeedPaths    []string `json:"seed_paths,omitempty"`
+}
+
+func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	statuses := seed.ScanAgentFiles(s.workspace)
+	resp := agentCoverageResponse{
+		Agents: make([]agentEntry, 0, len(statuses)),
+		Total:  len(statuses),
+	}
+
+	for _, st := range statuses {
+		entry := agentEntry{
+			Key:      st.Key,
+			DestPath: st.DestPath,
+			Exists:   st.Exists,
+			Size:     st.Size,
+		}
+		if st.Exists {
+			resp.Covered++
+			entry.ModTime = st.ModTime.Format(time.RFC3339)
+			entry.Age = agentAge(st.ModTime)
+		}
+		resp.Agents = append(resp.Agents, entry)
+	}
+
+	// OpenClaw detection
+	det := seed.DetectOpenClaw()
+	if det.Installed {
+		oc := &openClawInfo{
+			Installed:    true,
+			StateDir:     det.StateDir,
+			Source:       det.Source,
+			ConfigExists: det.ConfigExists,
+			AgentDirs:    det.AgentDirs,
+			SeedPaths:    seed.OpenClawSeedPaths(det),
+		}
+		resp.OpenClaw = oc
+
+		// Check if OpenClaw AGENTS.md exists at the detected path
+		ocPath := filepath.Join(det.StateDir, "AGENTS.md")
+		if info, err := os.Stat(ocPath); err == nil {
+			// Update the openclaw entry in the agents list with real path info
+			for i := range resp.Agents {
+				if resp.Agents[i].Key == "openclaw" {
+					if !resp.Agents[i].Exists {
+						resp.Agents[i].Exists = true
+						resp.Agents[i].Size = info.Size()
+						resp.Agents[i].ModTime = info.ModTime().Format(time.RFC3339)
+						resp.Agents[i].Age = agentAge(info.ModTime())
+						resp.Agents[i].DestPath = ocPath
+						resp.Covered++
+					}
+					break
+				}
+			}
+		}
+	}
+
+	writeJSON(w, resp)
+}
+
+func agentAge(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1d ago"
+		}
+		return fmt.Sprintf("%dd ago", days)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {

@@ -171,6 +171,28 @@ tr:hover{background:rgba(88,166,255,.04)}
       </div>
     </div>
 
+    <!-- Agent Coverage -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Agent Coverage</h2>
+        <button class="btn" onclick="refreshAgents()">Refresh</button>
+      </div>
+      <div class="card-body">
+        <div id="agentSummary" style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="stat-item"><div class="val" id="agentCovered">-</div><div class="lbl">Seeded</div></div>
+          <div class="stat-item"><div class="val" id="agentTotal">-</div><div class="lbl">Total</div></div>
+        </div>
+        <div id="openclawBanner" style="display:none;padding:8px 12px;border-radius:6px;background:rgba(188,140,255,.1);border:1px solid rgba(188,140,255,.2);margin-bottom:12px;font-size:12px">
+          <span style="color:var(--purple);font-weight:600">OpenClaw</span>
+          <span style="color:var(--text-dim)" id="openclawDetail"></span>
+        </div>
+        <table>
+          <thead><tr><th>Agent</th><th>Destination</th><th>Status</th><th>Size</th><th>Age</th></tr></thead>
+          <tbody id="agentsTable"><tr><td colspan="5" class="empty">Loading agents...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- CVE Scanner -->
     <div class="card">
       <div class="card-header">
@@ -618,6 +640,63 @@ async function refreshTrust() {
   tbody.innerHTML = html;
 }
 
+// Agent Coverage
+async function refreshAgents() {
+  const data = await fetchJSON('/api/agents');
+  if (!data) return;
+
+  document.getElementById('agentCovered').textContent = data.covered || 0;
+  document.getElementById('agentTotal').textContent = data.total || 0;
+
+  // OpenClaw banner
+  const banner = document.getElementById('openclawBanner');
+  const detail = document.getElementById('openclawDetail');
+  if (data.openclaw && data.openclaw.installed) {
+    banner.style.display = 'block';
+    let src = data.openclaw.source || '';
+    if (src.startsWith('env:')) src = 'env: ' + src.substring(4);
+    detail.textContent = ' detected at ' + escHtml(data.openclaw.state_dir) + ' (' + escHtml(src) + ')';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  // Agents table
+  const agents = data.agents || [];
+  const tbody = document.getElementById('agentsTable');
+
+  if (agents.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No agents configured</td></tr>';
+    return;
+  }
+
+  let html = '';
+  for (const a of agents) {
+    const isOC = a.key === 'openclaw' && data.openclaw && data.openclaw.installed;
+    html += '<tr>';
+    html += '<td><span style="font-weight:600">' + escHtml(a.key) + '</span>';
+    if (isOC) html += ' <span style="color:var(--purple);font-size:10px;font-weight:600">DETECTED</span>';
+    html += '</td>';
+    html += '<td><code style="font-size:11px">' + escHtml(a.dest_path) + '</code></td>';
+    if (a.exists) {
+      html += '<td><span class="status-badge active"><span class="dot"></span> Seeded</span></td>';
+      html += '<td>' + formatBytes(a.size) + '</td>';
+      html += '<td>' + escHtml(a.age || '-') + '</td>';
+    } else {
+      html += '<td><span style="color:var(--text-dim)">Not seeded</span></td>';
+      html += '<td>-</td><td>-</td>';
+    }
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function formatBytes(bytes) {
+  if (!bytes && bytes !== 0) return '-';
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return bytes + ' B';
+}
+
 // Initialize
 async function init() {
   await Promise.all([
@@ -625,7 +704,8 @@ async function init() {
     refreshSessions(),
     refreshMetrics(),
     refreshCVE(),
-    refreshTrust()
+    refreshTrust(),
+    refreshAgents()
   ]);
 
   // Connect SSE
@@ -638,6 +718,7 @@ async function init() {
     refreshMetrics();
     refreshCVE();
     refreshTrust();
+    refreshAgents();
   }, 10000);
 }
 
