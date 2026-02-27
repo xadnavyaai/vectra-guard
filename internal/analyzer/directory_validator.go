@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"strings"
+	"unicode"
 )
 
 // ValidateProtectedDirectory checks if a command targets a protected directory.
@@ -64,24 +65,25 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 			continue
 		}
 
-		// Check if it's a Unix-style absolute path (starts with /)
-		// We handle Unix paths specially to work cross-platform
-		if !strings.HasPrefix(fieldTrimmed, "/") {
-			// Non-absolute paths aren't considered here – they may be relative
-			// paths that are handled by other logic.
+		isUnixAbs := strings.HasPrefix(fieldTrimmed, "/")
+		isWinAbs := isWindowsAbsPath(fieldTrimmed)
+
+		if !isUnixAbs && !isWinAbs {
 			continue
 		}
 
-		// For Unix-style absolute paths, normalize manually to preserve the leading /
-		// This works cross-platform (even on Windows, we want to detect Unix paths in commands)
-		argPath := strings.TrimRight(fieldTrimmed, "/")
-		if argPath == "" {
-			argPath = "/"
+		var argPathLower string
+		if isWinAbs {
+			argPathLower = normalizeWindowsPath(fieldTrimmed)
+		} else {
+			// For Unix-style absolute paths, normalize manually to preserve the leading /
+			argPath := strings.TrimRight(fieldTrimmed, "/")
+			if argPath == "" {
+				argPath = "/"
+			}
+			argPath = "/" + strings.TrimLeft(strings.ReplaceAll(argPath, "//", "/"), "/")
+			argPathLower = strings.ToLower(argPath)
 		}
-		// Remove any double slashes but keep the leading one
-		argPath = "/" + strings.TrimLeft(strings.ReplaceAll(argPath, "//", "/"), "/")
-
-		argPathLower := strings.ToLower(argPath)
 
 		for _, protectedDir := range protectedDirs {
 			if protectedDir == "" {
@@ -89,24 +91,22 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 			}
 
 			protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
-			// Normalize Unix-style paths manually (works cross-platform)
 			var protectedDirNormalized string
-			if strings.HasPrefix(protectedDirLower, "/") {
-				// Unix-style path - normalize manually
+
+			if isWindowsAbsPath(protectedDirLower) {
+				protectedDirNormalized = normalizeWindowsPath(protectedDirLower)
+			} else if strings.HasPrefix(protectedDirLower, "/") {
 				protectedDirNormalized = strings.TrimRight(protectedDirLower, "/")
 				if protectedDirNormalized == "" {
 					protectedDirNormalized = "/"
 				} else {
-					// Remove double slashes but keep leading /
 					protectedDirNormalized = "/" + strings.TrimLeft(strings.ReplaceAll(protectedDirNormalized, "//", "/"), "/")
 				}
 			} else {
-				// Relative path - make it absolute
 				protectedDirNormalized = "/" + strings.TrimLeft(protectedDirLower, "/")
 			}
 
-			// Special handling for root directory. We treat arguments that are
-			// exactly "/" or "/*" as targeting the root directory.
+			// Special handling for root directory.
 			if protectedDirNormalized == "/" {
 				if argPathLower == "/" || argPathLower == "/*" {
 					return true, "/"
@@ -114,7 +114,7 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 				continue
 			}
 
-			// Exact match: e.g. "rm -rf /etc"
+			// Exact match: e.g. "rm -rf /etc" or "rm -rf c:\windows"
 			if argPathLower == protectedDirNormalized {
 				if len(protectedDirNormalized) > len(bestMatch) {
 					bestMatch = protectedDirNormalized
@@ -122,16 +122,21 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 				continue
 			}
 
-			// Prefix match: e.g. "rm -rf /etc/passwd" should match /etc
-			if strings.HasPrefix(argPathLower, protectedDirNormalized+"/") {
+			// Prefix match: e.g. "rm -rf /etc/passwd" or "rm -rf c:\windows\system32"
+			sep := "/"
+			if isWinAbs && isWindowsAbsPath(protectedDirLower) {
+				sep = `\`
+			}
+			if strings.HasPrefix(argPathLower, protectedDirNormalized+sep) {
 				if len(protectedDirNormalized) > len(bestMatch) {
 					bestMatch = protectedDirNormalized
 				}
 				continue
 			}
 
-			// Wildcard-style patterns such as "/etc/*" or "/etc/**"
-			if strings.HasPrefix(argPathLower, protectedDirNormalized+"/*") {
+			// Wildcard-style patterns such as "/etc/*" or "c:\windows\*"
+			if strings.HasPrefix(argPathLower, protectedDirNormalized+"/*") ||
+				strings.HasPrefix(argPathLower, protectedDirNormalized+`\*`) {
 				if len(protectedDirNormalized) > len(bestMatch) {
 					bestMatch = protectedDirNormalized
 				}
@@ -140,12 +145,58 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 		}
 	}
 
-	// If we found a specific protected directory match, return it.
+	if bestMatch != "" {
+		return true, bestMatch
+	}
+
+	// Fallback: direct substring match for Windows protected dirs whose paths
+	// contain spaces (e.g. "C:\Program Files"). strings.Fields splits these
+	// across tokens so the tokenised loop above won't reassemble them.
+	for _, protectedDir := range protectedDirs {
+		if protectedDir == "" {
+			continue
+		}
+		protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
+		if !isWindowsAbsPath(protectedDirLower) || !strings.Contains(protectedDirLower, " ") {
+			continue
+		}
+		norm := normalizeWindowsPath(protectedDirLower)
+		// Also build a forward-slash variant so we match both styles.
+		normFwd := strings.ReplaceAll(norm, `\`, "/")
+
+		if strings.Contains(commandLower, norm) || strings.Contains(commandLower, normFwd) {
+			if len(norm) > len(bestMatch) {
+				bestMatch = norm
+			}
+		}
+	}
+
 	if bestMatch != "" {
 		return true, bestMatch
 	}
 
 	return false, ""
+}
+
+// isWindowsAbsPath returns true for paths like C:\, D:\foo, c:/bar.
+func isWindowsAbsPath(p string) bool {
+	if len(p) < 2 {
+		return false
+	}
+	return unicode.IsLetter(rune(p[0])) && p[1] == ':' && (len(p) == 2 || p[2] == '\\' || p[2] == '/')
+}
+
+// normalizeWindowsPath lowercases and normalizes separators to backslash,
+// stripping trailing separators.
+func normalizeWindowsPath(p string) string {
+	p = strings.ToLower(p)
+	p = strings.ReplaceAll(p, "/", `\`)
+	p = strings.TrimRight(p, `\`)
+	// Ensure drive root keeps trailing backslash: "c:" → "c:\"
+	if len(p) == 2 && p[1] == ':' {
+		p += `\`
+	}
+	return p
 }
 
 // IsProtectedDirectory checks if a given path matches any protected directory.
@@ -163,11 +214,13 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 		return false
 	}
 
-	// Normalize path - handle Unix-style paths cross-platform
 	pathLower := strings.ToLower(pathTrimmed)
+	isWin := isWindowsAbsPath(pathLower)
+
 	var pathNormalized string
-	if strings.HasPrefix(pathLower, "/") {
-		// Unix-style absolute path - normalize manually
+	if isWin {
+		pathNormalized = normalizeWindowsPath(pathLower)
+	} else if strings.HasPrefix(pathLower, "/") {
 		pathNormalized = strings.TrimRight(pathLower, "/")
 		if pathNormalized == "" {
 			pathNormalized = "/"
@@ -175,7 +228,6 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 			pathNormalized = "/" + strings.TrimLeft(strings.ReplaceAll(pathNormalized, "//", "/"), "/")
 		}
 	} else {
-		// Not an absolute Unix path - not protected
 		return false
 	}
 
@@ -186,8 +238,11 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 
 		protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
 		var protectedDirNormalized string
-		if strings.HasPrefix(protectedDirLower, "/") {
-			// Unix-style path - normalize manually
+		protectedIsWin := isWindowsAbsPath(protectedDirLower)
+
+		if protectedIsWin {
+			protectedDirNormalized = normalizeWindowsPath(protectedDirLower)
+		} else if strings.HasPrefix(protectedDirLower, "/") {
 			protectedDirNormalized = strings.TrimRight(protectedDirLower, "/")
 			if protectedDirNormalized == "" {
 				protectedDirNormalized = "/"
@@ -195,7 +250,6 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 				protectedDirNormalized = "/" + strings.TrimLeft(strings.ReplaceAll(protectedDirNormalized, "//", "/"), "/")
 			}
 		} else {
-			// Relative path - make it absolute
 			protectedDirNormalized = "/" + strings.TrimLeft(protectedDirLower, "/")
 		}
 
@@ -204,14 +258,17 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 			return true
 		}
 
-		// Prefix match (path is inside protected directory)
-		if strings.HasPrefix(pathNormalized, protectedDirNormalized+"/") {
+		// Prefix match
+		sep := "/"
+		if isWin && protectedIsWin {
+			sep = `\`
+		}
+		if strings.HasPrefix(pathNormalized, protectedDirNormalized+sep) {
 			return true
 		}
 
 		// Special case: root directory
 		if protectedDirNormalized == "/" {
-			// Any absolute path is under root (except root itself which is exact match)
 			if pathNormalized != "/" && strings.HasPrefix(pathNormalized, "/") {
 				return true
 			}

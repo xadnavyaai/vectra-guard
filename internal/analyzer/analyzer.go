@@ -152,6 +152,36 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 					"rm -rf /applications",
 					"rm -rf /tmp/*", // Temp directory wildcard deletion
 					"rm -r /tmp/*",  // Temp directory wildcard deletion (without force)
+
+					// Windows system directories (backslash)
+					`rm -rf c:\`,
+					`rm -rf c:\windows`,
+					`rm -rf c:\windows\system32`,
+					`rm -rf c:\windows\syswow64`,
+					`rm -rf c:\program files`,
+					`rm -rf c:\program files (x86)`,
+					`rm -rf c:\programdata`,
+					`rm -rf c:\users`,
+					`rm -rf d:\`,
+					`rm -r c:\`,
+					`rm -r c:\windows`,
+					`rm -r c:\windows\system32`,
+					`rm -r c:\program files`,
+					`rm -r c:\users`,
+
+					// Windows system directories (forward slash)
+					"rm -rf c:/",
+					"rm -rf c:/windows",
+					"rm -rf c:/windows/system32",
+					"rm -rf c:/program files",
+					"rm -rf c:/program files (x86)",
+					"rm -rf c:/programdata",
+					"rm -rf c:/users",
+					"rm -rf d:/",
+					"rm -r c:/",
+					"rm -r c:/windows",
+					"rm -r c:/program files",
+					"rm -r c:/users",
 				}
 
 				for _, pattern := range rootDeletePatterns {
