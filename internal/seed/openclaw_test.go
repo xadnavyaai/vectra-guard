@@ -150,10 +150,14 @@ func TestDetectOpenClaw_WithAgentSubdirs(t *testing.T) {
 }
 
 func TestOpenClawSeedPaths_Installed(t *testing.T) {
+	stateDir := filepath.Join(string(filepath.Separator), "home", "user", ".openclaw")
+	ws1 := filepath.Join(string(filepath.Separator), "tmp", "workspace-1")
+	ws2 := filepath.Join(string(filepath.Separator), "tmp", "workspace-2")
+
 	det := OpenClawDetection{
-		StateDir:  "/home/user/.openclaw",
+		StateDir:  stateDir,
 		Installed: true,
-		AgentDirs: []string{"/tmp/workspace-1", "/tmp/workspace-2"},
+		AgentDirs: []string{ws1, ws2},
 	}
 
 	paths := OpenClawSeedPaths(det)
@@ -161,13 +165,13 @@ func TestOpenClawSeedPaths_Installed(t *testing.T) {
 	if len(paths) != 3 {
 		t.Fatalf("expected 3 paths, got %d: %v", len(paths), paths)
 	}
-	if paths[0] != "/home/user/.openclaw/AGENTS.md" {
+	if paths[0] != filepath.Join(stateDir, "AGENTS.md") {
 		t.Errorf("expected primary path, got %q", paths[0])
 	}
-	if paths[1] != "/tmp/workspace-1/AGENTS.md" {
+	if paths[1] != filepath.Join(ws1, "AGENTS.md") {
 		t.Errorf("expected workspace-1 path, got %q", paths[1])
 	}
-	if paths[2] != "/tmp/workspace-2/AGENTS.md" {
+	if paths[2] != filepath.Join(ws2, "AGENTS.md") {
 		t.Errorf("expected workspace-2 path, got %q", paths[2])
 	}
 }

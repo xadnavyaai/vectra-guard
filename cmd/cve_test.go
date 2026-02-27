@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/vectra-guard/vectra-guard/internal/config"
@@ -24,6 +25,11 @@ func TestResolveCVECachePath(t *testing.T) {
 	prevHome := os.Getenv("HOME")
 	t.Cleanup(func() { _ = os.Setenv("HOME", prevHome) })
 	_ = os.Setenv("HOME", tmp)
+	if runtime.GOOS == "windows" {
+		prevProfile := os.Getenv("USERPROFILE")
+		t.Cleanup(func() { _ = os.Setenv("USERPROFILE", prevProfile) })
+		_ = os.Setenv("USERPROFILE", tmp)
+	}
 
 	cfg := config.CVEConfig{
 		Enabled:             true,

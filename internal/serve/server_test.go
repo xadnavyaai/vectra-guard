@@ -162,13 +162,13 @@ func TestSessionIDPathTraversal(t *testing.T) {
 	// and Go's HTTP parser rejects null bytes and invalid URLs at the transport level.
 	// Our regex validation catches everything that gets through those layers.
 	maliciousIDs := []string{
-		"session;rm",           // shell metacharacters
-		"session<script>",      // XSS attempt
-		"$HOME",                // shell variable expansion
-		"session%2f",           // encoded slash
-		"session@host",         // at sign
-		"session&cmd",          // ampersand
-		"session|pipe",         // pipe
+		"session;rm",      // shell metacharacters
+		"session<script>", // XSS attempt
+		"$HOME",           // shell variable expansion
+		"session%2f",      // encoded slash
+		"session@host",    // at sign
+		"session&cmd",     // ampersand
+		"session|pipe",    // pipe
 		// Very long ID (> 64 chars)
 		"session-12345678901234567890123456789012345678901234567890-overflow",
 	}
@@ -209,8 +209,8 @@ func TestSecurityHeaders(t *testing.T) {
 
 	checks := map[string]string{
 		"X-Content-Type-Options": "nosniff",
-		"X-Frame-Options":       "DENY",
-		"Referrer-Policy":       "no-referrer",
+		"X-Frame-Options":        "DENY",
+		"Referrer-Policy":        "no-referrer",
 	}
 
 	for header, expected := range checks {

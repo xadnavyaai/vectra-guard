@@ -4,14 +4,24 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 )
 
+// setHomeDir sets environment variables so os.UserHomeDir() returns dir on all platforms.
+func setHomeDir(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", dir)
+	}
+}
+
 func TestRunInitCreatesGlobalConfig(t *testing.T) {
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setHomeDir(t, homeDir)
 
 	ctx := logging.WithLogger(context.Background(), logging.NewLogger("text", os.Stdout))
 	// Default (no --local, no --global) should write to ~/.config/vectra-guard/config.yaml
@@ -42,7 +52,7 @@ func TestRunInitCreatesLocalConfig(t *testing.T) {
 
 func TestRunInitRespectsTomlFlag(t *testing.T) {
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setHomeDir(t, homeDir)
 
 	ctx := logging.WithLogger(context.Background(), logging.NewLogger("text", os.Stdout))
 	if err := runInit(ctx, false, true, false, false); err != nil {
@@ -57,7 +67,7 @@ func TestRunInitRespectsTomlFlag(t *testing.T) {
 
 func TestRunInitRequiresForce(t *testing.T) {
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setHomeDir(t, homeDir)
 
 	configDir := filepath.Join(homeDir, ".config", "vectra-guard")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {

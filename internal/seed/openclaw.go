@@ -8,9 +8,9 @@ import (
 
 // OpenClawDetection holds the result of detecting an OpenClaw installation.
 type OpenClawDetection struct {
-	StateDir     string   // e.g. ~/.openclaw
-	Source       string   // "env:OPENCLAW_STATE_DIR", "default", "legacy:clawdbot", etc.
-	ConfigFile   string   // path to openclaw.json
+	StateDir     string // e.g. ~/.openclaw
+	Source       string // "env:OPENCLAW_STATE_DIR", "default", "legacy:clawdbot", etc.
+	ConfigFile   string // path to openclaw.json
 	ConfigExists bool
 	AgentDirs    []string // per-agent workspace dirs found
 	Installed    bool
