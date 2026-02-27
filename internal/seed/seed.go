@@ -6,6 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/vectra-guard/vectra-guard/internal/config"
 )
 
 //go:embed templates/**
@@ -119,4 +122,105 @@ func WriteAgentInstructions(targetDir string, force bool, selected []string) ([]
 	}
 
 	return results, nil
+}
+
+// WorkspaceContext holds detected information about the target workspace.
+type WorkspaceContext struct {
+	AbsPath      string
+	IsGitRepo    bool
+	RepoName     string
+	Branch       string
+	ProjectTypes []string
+}
+
+// AgentFileStatus describes the state of a single agent instruction file.
+type AgentFileStatus struct {
+	Key      string
+	DestPath string
+	Exists   bool
+	Size     int64
+	ModTime  time.Time
+}
+
+// DetectWorkspaceContext resolves the absolute path and detects git/project info.
+func DetectWorkspaceContext(workdir string) WorkspaceContext {
+	abs, err := filepath.Abs(workdir)
+	if err != nil {
+		abs = workdir
+	}
+
+	wc := WorkspaceContext{
+		AbsPath:   abs,
+		IsGitRepo: config.IsGitRepo(abs),
+	}
+
+	if wc.IsGitRepo {
+		remote := config.GetGitRemoteURL(abs)
+		wc.RepoName = config.ParseRepoName(remote)
+		wc.Branch = config.GetCurrentGitBranch(abs)
+	}
+
+	wc.ProjectTypes = detectProjectTypes(abs)
+	return wc
+}
+
+// detectProjectTypes checks for common project manifest files.
+func detectProjectTypes(workdir string) []string {
+	indicators := []struct {
+		file  string
+		label string
+	}{
+		{"go.mod", "Go"},
+		{"package.json", "Node.js"},
+		{"requirements.txt", "Python"},
+		{"Pipfile", "Python"},
+		{"pyproject.toml", "Python"},
+		{"Cargo.toml", "Rust"},
+		{"pom.xml", "Java"},
+		{"build.gradle", "Java"},
+		{"Gemfile", "Ruby"},
+		{"Makefile", "Make"},
+		{"Dockerfile", "Docker"},
+		{"docker-compose.yml", "Docker"},
+		{"docker-compose.yaml", "Docker"},
+	}
+
+	seen := map[string]bool{}
+	var types []string
+	for _, ind := range indicators {
+		if _, err := os.Stat(filepath.Join(workdir, ind.file)); err == nil {
+			if !seen[ind.label] {
+				seen[ind.label] = true
+				types = append(types, ind.label)
+			}
+		}
+	}
+	return types
+}
+
+// ScanAgentFiles checks all available targets for existence/size/age.
+func ScanAgentFiles(workdir string) []AgentFileStatus {
+	available := AvailableTargets()
+	// Use sorted order for deterministic output
+	keys := []string{"agents", "claude", "codex", "copilot", "cursor", "openclaw", "vscode", "windsurf"}
+
+	var statuses []AgentFileStatus
+	for _, key := range keys {
+		t, ok := available[key]
+		if !ok {
+			continue
+		}
+		path := filepath.Join(workdir, t.DestPath)
+		st := AgentFileStatus{
+			Key:      key,
+			DestPath: t.DestPath,
+		}
+		if info, err := os.Stat(path); err == nil {
+			st.Exists = true
+			st.Size = info.Size()
+			st.ModTime = info.ModTime()
+		}
+		statuses = append(statuses, st)
+	}
+	return statuses
 }

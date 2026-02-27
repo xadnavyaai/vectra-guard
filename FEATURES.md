@@ -396,10 +396,11 @@ vg lockdown status   # enabled
 vg lockdown disable  # Restore
 ```
 
-**Local-only dashboard**
+**Local-only dashboard** ([full docs](docs/dashboard.md))
 ```bash
 vg serve
-# Serving at http://127.0.0.1:PORT (never 0.0.0.0)
+# Serving at http://127.0.0.1:8000 (never 0.0.0.0)
+# Real-time live feed, session monitoring, sandbox metrics, CVE summary, trust store
 ```
 
 See **[Control Panel & AI Agent Deployment Security](docs/control-panel-security.md)** for a checklist, CI examples, and full rule reference (Go/Python/C/config).
@@ -522,9 +523,11 @@ AI tools are amazing — but they can run *dangerous commands*, install *vulnera
 
 - [Installation Guide](README.md#-installation)
 - [Configuration Guide](CONFIGURATION.md)
+- [Security Dashboard](docs/dashboard.md)
 - [CVE Awareness Design](docs/cve-awareness.md)
 - [Control Panel & Deployment Security](docs/control-panel-security.md)
 - [Sandbox Documentation](SANDBOX.md)
+- [Soft Delete](docs/soft-delete.md)
 - [Roadmap](roadmap.md)
 - [Docs Index](docs/README.md)
 

@@ -955,3 +955,76 @@ func GetCurrentGitBranch(workdir string) string {
 
 	return ""
 }
+
+// IsGitRepo returns true if workdir contains a .git directory.
+func IsGitRepo(workdir string) bool {
+	info, err := os.Stat(filepath.Join(workdir, ".git"))
+	return err == nil && info.IsDir()
+}
+
+// GetGitRemoteURL reads the origin remote URL from .git/config.
+func GetGitRemoteURL(workdir string) string {
+	data, err := os.ReadFile(filepath.Join(workdir, ".git", "config"))
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(data), "\n")
+	inOrigin := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == `[remote "origin"]` {
+			inOrigin = true
+			continue
+		}
+		if inOrigin {
+			if strings.HasPrefix(trimmed, "[") {
+				break // next section
+			}
+			if strings.HasPrefix(trimmed, "url = ") {
+				return strings.TrimSpace(strings.TrimPrefix(trimmed, "url = "))
+			}
+		}
+	}
+	return ""
+}
+
+// ParseRepoName extracts "org/repo" from an HTTPS or SSH git remote URL.
+func ParseRepoName(remoteURL string) string {
+	if remoteURL == "" {
+		return ""
+	}
+	// SSH: git@github.com:org/repo.git
+	if strings.Contains(remoteURL, ":") && strings.Contains(remoteURL, "@") {
+		parts := strings.SplitN(remoteURL, ":", 2)
+		if len(parts) == 2 {
+			name := parts[1]
+			name = strings.TrimSuffix(name, ".git")
+			return name
+		}
+	}
+	// HTTPS: https://github.com/org/repo.git
+	remoteURL = strings.TrimSuffix(remoteURL, ".git")
+	parts := strings.Split(remoteURL, "/")
+	if len(parts) >= 2 {
+		return parts[len(parts)-2] + "/" + parts[len(parts)-1]
+	}
+	return ""
+}
+
+type configPathsKey struct{}
+
+// WithConfigPaths stores the loaded config file paths on the context.
+func WithConfigPaths(ctx context.Context, paths []string) context.Context {
+	return context.WithValue(ctx, configPathsKey{}, paths)
+}
+
+// ConfigPathsFromContext retrieves the loaded config file paths from context.
+func ConfigPathsFromContext(ctx context.Context) []string {
+	if ctx == nil {
+		return nil
+	}
+	if paths, ok := ctx.Value(configPathsKey{}).([]string); ok {
+		return paths
+	}
+	return nil
+}

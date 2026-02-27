@@ -46,13 +46,14 @@ func execute(args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolve working directory: %w", err)
 	}
-	cfg, _, err := config.Load(*configPath, workdir)
+	cfg, loadedPaths, err := config.Load(*configPath, workdir)
 	if err != nil {
 		return err
 	}
 
 	ctx := context.Background()
 	ctx = config.WithConfig(ctx, cfg)
+	ctx = config.WithConfigPaths(ctx, loadedPaths)
 	ctx = logging.WithLogger(ctx, logging.NewLogger(*outputFormat, os.Stdout))
 
 	subcommand := root.Arg(0)

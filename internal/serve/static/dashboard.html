@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'">
+<title>VectraGuard Security Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;
+  --text-dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--yellow:#d29922;
+  --red:#f85149;--orange:#db6d28;--purple:#bc8cff;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.5;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+.container{max-width:1400px;margin:0 auto;padding:16px}
+
+/* Status Bar */
+.status-bar{display:flex;align-items:center;gap:16px;padding:12px 20px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  margin-bottom:16px;flex-wrap:wrap}
+.status-bar .logo{font-size:18px;font-weight:700;color:var(--accent);white-space:nowrap}
+.status-bar .divider{width:1px;height:24px;background:var(--border)}
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:12px;font-size:12px;font-weight:600;background:rgba(88,166,255,.12)}
+.status-badge.active{background:rgba(63,185,80,.15);color:var(--green)}
+.status-badge .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.stat-item{text-align:center;min-width:80px}
+.stat-item .val{font-size:20px;font-weight:700}
+.stat-item .lbl{font-size:11px;color:var(--text-dim);text-transform:uppercase}
+
+/* Grid Layout */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-full{grid-column:1/-1}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px;border-bottom:1px solid var(--border)}
+.card-header h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.card-body{padding:16px;max-height:420px;overflow-y:auto}
+.card-body.tall{max-height:520px}
+
+/* Live Feed */
+.event-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);
+  font-size:13px;animation:fadeIn .3s ease}
+.event-item:last-child{border-bottom:none}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.event-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.event-dot.critical,.event-dot.blocked{background:var(--red)}
+.event-dot.high{background:var(--orange)}
+.event-dot.medium{background:var(--yellow)}
+.event-dot.low,.event-dot.safe{background:var(--green)}
+.event-dot.info{background:var(--accent)}
+.event-time{color:var(--text-dim);font-size:11px;white-space:nowrap;min-width:60px}
+.event-text{flex:1}
+.event-cmd{font-family:monospace;color:var(--accent);font-size:12px}
+
+/* Chart Container */
+.chart-wrap{position:relative;height:220px;display:flex;justify-content:center;align-items:center}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-dim);
+  font-size:11px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;
+  background:var(--surface)}
+td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover{background:rgba(88,166,255,.04)}
+
+/* Risk badges */
+.risk{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.risk.critical{background:rgba(248,81,73,.2);color:var(--red)}
+.risk.high{background:rgba(219,109,40,.2);color:var(--orange)}
+.risk.medium{background:rgba(210,153,34,.2);color:var(--yellow)}
+.risk.low{background:rgba(63,185,80,.2);color:var(--green)}
+.risk.safe{background:rgba(63,185,80,.12);color:var(--green)}
+.risk.unknown{background:rgba(139,148,158,.2);color:var(--text-dim)}
+
+/* Mode badges */
+.mode{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.mode.sandbox{background:rgba(188,140,255,.2);color:var(--purple)}
+.mode.host{background:rgba(88,166,255,.2);color:var(--accent)}
+
+/* Buttons */
+.btn{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text);cursor:pointer;font-size:12px;font-weight:600;transition:background .15s}
+.btn:hover{background:var(--border)}
+.btn.primary{background:rgba(88,166,255,.15);border-color:var(--accent);color:var(--accent)}
+
+/* Pause indicator */
+.paused-label{font-size:11px;color:var(--yellow);font-weight:600}
+
+/* Trust table extras */
+.expired{opacity:.5}
+.expired-badge{color:var(--red);font-size:11px;font-weight:600}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-dim)}
+
+/* Empty state */
+.empty{text-align:center;padding:32px;color:var(--text-dim);font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Status Bar -->
+  <div class="status-bar" id="statusBar">
+    <div class="logo">VectraGuard</div>
+    <div class="divider"></div>
+    <span class="status-badge active"><span class="dot"></span> <span id="statusVersion">Loading...</span></span>
+    <span class="status-badge" id="statusGuard">Guard: --</span>
+    <span class="status-badge" id="statusSandbox">Sandbox: --</span>
+    <div style="flex:1"></div>
+    <div class="stat-item"><div class="val" id="statSessions">-</div><div class="lbl">Sessions</div></div>
+    <div class="stat-item"><div class="val" id="statCommands">-</div><div class="lbl">Commands</div></div>
+    <div class="stat-item"><div class="val" id="statBlocked">-</div><div class="lbl">Blocked</div></div>
+    <div class="stat-item"><div class="val" id="statUptime">-</div><div class="lbl">Uptime</div></div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid">
+    <!-- Live Event Feed -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Live Event Feed</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="paused-label" id="pausedLabel" style="display:none">PAUSED</span>
+          <button class="btn" id="pauseBtn" onclick="togglePause()">Pause</button>
+        </div>
+      </div>
+      <div class="card-body tall" id="eventFeed">
+        <div class="empty">Waiting for events...</div>
+      </div>
+    </div>
+
+    <!-- Risk Distribution -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Risk Distribution</h2>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap"><canvas id="riskChart"></canvas></div>
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+          <div class="chart-wrap" style="height:180px"><canvas id="modeChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions Panel -->
+    <div class="card grid-full">
+      <div class="card-header">
+        <h2>Sessions</h2>
+        <button class="btn" onclick="refreshSessions()">Refresh</button>
+      </div>
+      <div class="card-body">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Agent</th><th>Workspace</th><th>Started</th>
+            <th>Commands</th><th>Risk Score</th><th>Status</th>
+          </tr></thead>
+          <tbody id="sessionsTable"><tr><td colspan="7" class="empty">Loading sessions...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CVE Scanner -->
+    <div class="card">
+      <div class="card-header">
+        <h2>CVE Scanner</h2>
+      </div>
+      <div class="card-body">
+        <div id="cveSummary" style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="stat-item"><div class="val" id="cvePackages">-</div><div class="lbl">Packages</div></div>
+          <div class="stat-item"><div class="val" id="cveVulns">-</div><div class="lbl">Vulnerabilities</div></div>
+          <div class="stat-item"><div class="val" id="cveCritical" style="color:var(--red)">-</div><div class="lbl">Critical</div></div>
+          <div class="stat-item"><div class="val" id="cveHigh" style="color:var(--orange)">-</div><div class="lbl">High</div></div>
+        </div>
+        <table>
+          <thead><tr><th>Package</th><th>Version</th><th>CVE</th><th>Severity</th><th>Summary</th></tr></thead>
+          <tbody id="cveTable"><tr><td colspan="5" class="empty">No CVE data available</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Trust Store -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Trust Store</h2>
+      </div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>Command</th><th>Approved</th><th>Uses</th><th>Last Used</th><th>Expires</th></tr></thead>
+          <tbody id="trustTable"><tr><td colspan="5" class="empty">No trusted commands</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Execution History -->
+    <div class="card grid-full">
+      <div class="card-header">
+        <h2>Execution History</h2>
+        <button class="btn" onclick="refreshMetrics()">Refresh</button>
+      </div>
+      <div class="card-body tall">
+        <table>
+          <thead><tr>
+            <th>Timestamp</th><th>Command</th><th>Mode</th><th>Runtime</th>
+            <th>Duration</th><th>Risk</th><th>Exit</th>
+          </tr></thead>
+          <tbody id="historyTable"><tr><td colspan="7" class="empty">No execution history</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// State
+let paused = false;
+let events = [];
+let riskChart = null;
+let modeChart = null;
+
+// Time formatting
+function timeAgo(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  const diff = Date.now() - d.getTime();
+  if (diff < 60000) return Math.floor(diff/1000) + 's ago';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  return Math.floor(diff/86400000) + 'd ago';
+}
+
+function shortTime(ts) {
+  if (!ts) return '-';
+  return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function shortDate(ts) {
+  if (!ts) return '-';
+  return new Date(ts).toLocaleDateString([], {month:'short',day:'numeric'}) + ' ' + shortTime(ts);
+}
+
+function riskClass(level) {
+  if (!level) return 'unknown';
+  return sanitizeClass(level.toLowerCase());
+}
+
+// sanitizeClass strips any character that isn't a safe CSS class name character.
+// Prevents class attribute injection from untrusted data.
+function sanitizeClass(s) {
+  return s.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function truncCmd(cmd, max) {
+  max = max || 50;
+  if (!cmd) return '-';
+  return cmd.length > max ? cmd.substring(0, max) + '...' : cmd;
+}
+
+function durationStr(ns) {
+  if (!ns && ns !== 0) return '-';
+  // Go durations in JSON are nanoseconds
+  const ms = ns / 1000000;
+  if (ms < 1000) return Math.round(ms) + 'ms';
+  return (ms / 1000).toFixed(1) + 's';
+}
+
+// Toggle pause
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+  document.getElementById('pausedLabel').style.display = paused ? 'inline' : 'none';
+}
+
+// Event feed
+function addEvent(evt) {
+  events.unshift(evt);
+  if (events.length > 200) events = events.slice(0, 200);
+  if (!paused) renderEvents();
+}
+
+function renderEvents() {
+  const container = document.getElementById('eventFeed');
+  if (events.length === 0) {
+    container.innerHTML = '<div class="empty">Waiting for events...</div>';
+    return;
+  }
+  let html = '';
+  for (const evt of events.slice(0, 50)) {
+    const data = evt.data || {};
+    let dotClass = 'info';
+    let text = '';
+
+    switch (evt.type) {
+      case 'command_executed':
+        dotClass = riskClass(data.risk_level);
+        text = '<span class="event-cmd">' + escHtml(truncCmd(data.command, 60)) + '</span>';
+        if (data.agent) text += ' <span style="color:var(--text-dim)">by ' + escHtml(data.agent) + '</span>';
+        text += ' <span class="risk ' + riskClass(data.risk_level) + '">' + (data.risk_level || 'safe') + '</span>';
+        break;
+      case 'command_blocked':
+        dotClass = 'blocked';
+        text = '<span style="color:var(--red);font-weight:600">BLOCKED</span> ';
+        text += '<span class="event-cmd">' + escHtml(truncCmd(data.command, 60)) + '</span>';
+        if (data.agent) text += ' <span style="color:var(--text-dim)">by ' + escHtml(data.agent) + '</span>';
+        break;
+      case 'session_started':
+        dotClass = 'info';
+        text = 'Session started: <span style="color:var(--accent)">' + escHtml(data.session_id || '') + '</span>';
+        if (data.agent) text += ' <span style="color:var(--text-dim)">(' + escHtml(data.agent) + ')</span>';
+        break;
+      case 'session_ended':
+        dotClass = 'info';
+        text = 'Session ended: <span style="color:var(--accent)">' + escHtml(data.session_id || '') + '</span>';
+        text += ' <span style="color:var(--text-dim)">' + (data.commands || 0) + ' cmds, risk ' + (data.risk_score || 0) + '</span>';
+        break;
+      case 'metric_recorded':
+        dotClass = riskClass(data.risk_level);
+        text = '<span class="event-cmd">' + escHtml(truncCmd(data.command, 60)) + '</span>';
+        text += ' <span class="mode ' + sanitizeClass(data.mode || '') + '">' + escHtml(data.mode || '-') + '</span>';
+        break;
+      case 'connected':
+        dotClass = 'safe';
+        text = '<span style="color:var(--green)">Connected to event stream</span>';
+        break;
+      default:
+        text = evt.type + ': ' + JSON.stringify(data).substring(0, 80);
+    }
+
+    html += '<div class="event-item">';
+    html += '<div class="event-dot ' + dotClass + '"></div>';
+    html += '<div class="event-time">' + shortTime(evt.timestamp) + '</div>';
+    html += '<div class="event-text">' + text + '</div>';
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// SSE Connection
+function connectSSE() {
+  const source = new EventSource('/api/events');
+
+  source.onopen = function() {
+    console.log('SSE connected');
+  };
+
+  // Listen for all event types
+  const eventTypes = ['connected', 'command_executed', 'command_blocked',
+    'session_started', 'session_ended', 'metric_recorded', 'cve_found'];
+
+  eventTypes.forEach(function(type) {
+    source.addEventListener(type, function(e) {
+      try {
+        const parsed = JSON.parse(e.data);
+        addEvent(parsed);
+      } catch (err) {
+        console.error('SSE parse error:', err);
+      }
+    });
+  });
+
+  source.onerror = function() {
+    console.log('SSE error, will auto-reconnect');
+  };
+}
+
+// API calls
+async function fetchJSON(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.error('Fetch error:', url, e);
+    return null;
+  }
+}
+
+// Status bar
+async function refreshStatus() {
+  const data = await fetchJSON('/api/status');
+  if (!data) return;
+
+  document.getElementById('statusVersion').textContent = 'v' + (data.version || 'dev');
+  document.getElementById('statusGuard').textContent = 'Guard: ' + (data.guard_level || 'auto');
+  const sbMode = data.sandbox ? data.sandbox.mode : '-';
+  const sbEnabled = data.sandbox ? data.sandbox.enabled : false;
+  document.getElementById('statusSandbox').textContent = 'Sandbox: ' + (sbEnabled ? sbMode : 'off');
+  document.getElementById('statUptime').textContent = data.uptime || '-';
+}
+
+// Sessions
+async function refreshSessions() {
+  const data = await fetchJSON('/api/sessions');
+  const tbody = document.getElementById('sessionsTable');
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No sessions found</td></tr>';
+    document.getElementById('statSessions').textContent = '0';
+    document.getElementById('statCommands').textContent = '0';
+    return;
+  }
+
+  // Sort by start time descending
+  data.sort(function(a, b) { return new Date(b.start_time) - new Date(a.start_time); });
+
+  let totalCmds = 0;
+  let totalBlocked = 0;
+
+  let html = '';
+  for (const s of data) {
+    const cmdCount = s.commands ? s.commands.length : 0;
+    totalCmds += cmdCount;
+    totalBlocked += s.violations || 0;
+    const isActive = !s.end_time;
+    const riskColor = s.risk_score >= 100 ? 'var(--red)' :
+                      s.risk_score >= 50 ? 'var(--orange)' :
+                      s.risk_score >= 10 ? 'var(--yellow)' : 'var(--green)';
+
+    html += '<tr>';
+    html += '<td><code style="font-size:11px">' + escHtml((s.id || '').substring(0, 20)) + '</code></td>';
+    html += '<td>' + escHtml(s.agent_name || '-') + '</td>';
+    html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(s.workspace || '-') + '</td>';
+    html += '<td>' + timeAgo(s.start_time) + '</td>';
+    html += '<td>' + cmdCount + '</td>';
+    html += '<td><span style="color:' + riskColor + ';font-weight:600">' + (s.risk_score || 0) + '</span></td>';
+    html += '<td>' + (isActive ? '<span class="status-badge active"><span class="dot"></span> Active</span>' : '<span style="color:var(--text-dim)">Ended</span>') + '</td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+
+  document.getElementById('statSessions').textContent = data.length;
+  document.getElementById('statCommands').textContent = totalCmds;
+  document.getElementById('statBlocked').textContent = totalBlocked;
+}
+
+// Metrics & Charts
+async function refreshMetrics() {
+  const data = await fetchJSON('/api/metrics');
+  if (!data) return;
+
+  // Risk distribution chart
+  const riskData = data.by_risk_level || {};
+  const riskLabels = ['critical', 'high', 'medium', 'low', 'safe'];
+  const riskColors = ['#f85149', '#db6d28', '#d29922', '#3fb950', '#238636'];
+  const riskValues = riskLabels.map(function(l) { return riskData[l] || 0; });
+
+  if (riskChart) {
+    riskChart.data.datasets[0].data = riskValues;
+    riskChart.update();
+  } else {
+    const ctx = document.getElementById('riskChart').getContext('2d');
+    riskChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: riskLabels.map(function(l) { return l.charAt(0).toUpperCase() + l.slice(1); }),
+        datasets: [{
+          data: riskValues,
+          backgroundColor: riskColors,
+          borderColor: '#161b22',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#8b949e', boxWidth: 12, padding: 8, font: { size: 11 } } },
+          title: { display: true, text: 'Risk Levels', color: '#e6edf3', font: { size: 13 } }
+        }
+      }
+    });
+  }
+
+  // Mode distribution chart
+  const hostExec = data.host_executions || 0;
+  const sandboxExec = data.sandbox_executions || 0;
+  const cachedExec = data.cached_executions || 0;
+
+  if (modeChart) {
+    modeChart.data.datasets[0].data = [hostExec, sandboxExec, cachedExec];
+    modeChart.update();
+  } else {
+    const ctx2 = document.getElementById('modeChart').getContext('2d');
+    modeChart = new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: ['Host', 'Sandbox', 'Cached'],
+        datasets: [{
+          data: [hostExec, sandboxExec, cachedExec],
+          backgroundColor: ['#58a6ff', '#bc8cff', '#8b949e'],
+          borderColor: '#161b22',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#8b949e', boxWidth: 12, padding: 8, font: { size: 11 } } },
+          title: { display: true, text: 'Execution Mode', color: '#e6edf3', font: { size: 13 } }
+        }
+      }
+    });
+  }
+
+  // Execution history table
+  const history = data.execution_history || [];
+  const tbody = document.getElementById('historyTable');
+
+  if (history.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No execution history</td></tr>';
+    return;
+  }
+
+  // Show most recent first
+  const reversed = history.slice().reverse();
+  let html = '';
+  for (const rec of reversed) {
+    html += '<tr>';
+    html += '<td style="white-space:nowrap;font-size:11px">' + shortDate(rec.timestamp) + '</td>';
+    html += '<td><code style="font-size:12px">' + escHtml(truncCmd(rec.command, 60)) + '</code></td>';
+    html += '<td><span class="mode ' + sanitizeClass(rec.mode || '') + '">' + escHtml(rec.mode || '-') + '</span></td>';
+    html += '<td>' + escHtml(rec.runtime || '-') + '</td>';
+    html += '<td>' + durationStr(rec.duration) + '</td>';
+    html += '<td><span class="risk ' + riskClass(rec.risk_level) + '">' + (rec.risk_level || '-') + '</span></td>';
+    html += '<td>' + (rec.exit_code === 0 ? '<span style="color:var(--green)">0</span>' : '<span style="color:var(--red)">' + rec.exit_code + '</span>') + '</td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// CVE
+async function refreshCVE() {
+  const data = await fetchJSON('/api/cve');
+  if (!data) return;
+
+  document.getElementById('cvePackages').textContent = data.total_packages || 0;
+  document.getElementById('cveVulns').textContent = data.total_vulns || 0;
+  const bySev = data.by_severity || {};
+  document.getElementById('cveCritical').textContent = bySev.critical || 0;
+  document.getElementById('cveHigh').textContent = bySev.high || 0;
+
+  const entries = data.entries || [];
+  const tbody = document.getElementById('cveTable');
+
+  if (entries.length === 0 || data.total_vulns === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No vulnerabilities found</td></tr>';
+    return;
+  }
+
+  let html = '';
+  for (const pkg of entries) {
+    const vulns = pkg.vulnerabilities || [];
+    for (const v of vulns) {
+      html += '<tr>';
+      html += '<td>' + escHtml(pkg.ecosystem + '/' + pkg.name) + '</td>';
+      html += '<td><code>' + escHtml(pkg.version) + '</code></td>';
+      html += '<td><code style="font-size:11px">' + escHtml(v.id) + '</code></td>';
+      html += '<td><span class="risk ' + riskClass(v.severity) + '">' + (v.severity || 'unknown') + '</span></td>';
+      html += '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(v.summary || '-') + '</td>';
+      html += '</tr>';
+    }
+  }
+  tbody.innerHTML = html || '<tr><td colspan="5" class="empty">No vulnerabilities found</td></tr>';
+}
+
+// Trust Store
+async function refreshTrust() {
+  const data = await fetchJSON('/api/trust');
+  const tbody = document.getElementById('trustTable');
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No trusted commands</td></tr>';
+    return;
+  }
+
+  let html = '';
+  for (const entry of data) {
+    const isExpired = entry.expires_at && new Date(entry.expires_at) < new Date();
+    const rowClass = isExpired ? ' class="expired"' : '';
+
+    html += '<tr' + rowClass + '>';
+    html += '<td><code style="font-size:12px">' + escHtml(truncCmd(entry.command, 50)) + '</code>';
+    if (entry.note) html += '<br><span style="font-size:11px;color:var(--text-dim)">' + escHtml(entry.note) + '</span>';
+    html += '</td>';
+    html += '<td>' + timeAgo(entry.approved_at) + '</td>';
+    html += '<td>' + (entry.use_count || 0) + '</td>';
+    html += '<td>' + (entry.last_used && entry.last_used !== '0001-01-01T00:00:00Z' ? timeAgo(entry.last_used) : 'Never') + '</td>';
+    html += '<td>';
+    if (isExpired) {
+      html += '<span class="expired-badge">Expired</span>';
+    } else if (entry.expires_at && entry.expires_at !== '0001-01-01T00:00:00Z') {
+      html += timeAgo(entry.expires_at);
+    } else {
+      html += '<span style="color:var(--green)">Never</span>';
+    }
+    html += '</td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// Initialize
+async function init() {
+  await Promise.all([
+    refreshStatus(),
+    refreshSessions(),
+    refreshMetrics(),
+    refreshCVE(),
+    refreshTrust()
+  ]);
+
+  // Connect SSE
+  connectSSE();
+
+  // Auto-refresh every 10 seconds
+  setInterval(function() {
+    refreshStatus();
+    refreshSessions();
+    refreshMetrics();
+    refreshCVE();
+    refreshTrust();
+  }, 10000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
