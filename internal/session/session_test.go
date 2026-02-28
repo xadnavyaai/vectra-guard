@@ -4,13 +4,24 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 )
 
+func setTestHome(t *testing.T) {
+	t.Helper()
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", tempHome)
+	}
+}
+
 func TestSessionLifecycle(t *testing.T) {
+	setTestHome(t)
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
 
@@ -66,6 +77,7 @@ func TestSessionLifecycle(t *testing.T) {
 }
 
 func TestRiskScoring(t *testing.T) {
+	setTestHome(t)
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
 
@@ -114,6 +126,7 @@ func TestRiskScoring(t *testing.T) {
 }
 
 func TestFileOperations(t *testing.T) {
+	setTestHome(t)
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
 
@@ -161,6 +174,7 @@ func TestFileOperations(t *testing.T) {
 }
 
 func TestListSessions(t *testing.T) {
+	setTestHome(t)
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
 
@@ -169,25 +183,23 @@ func TestListSessions(t *testing.T) {
 		t.Fatalf("NewManager failed: %v", err)
 	}
 
-	// Get initial session count (may have sessions from other tests)
-	initialSessions, err := mgr.List()
-	if err != nil {
-		t.Fatalf("Initial List failed: %v", err)
-	}
-	initialCount := len(initialSessions)
-
 	// Create multiple sessions
-	session1, _ := mgr.Start("agent1", tmpDir)
-	session2, _ := mgr.Start("agent2", tmpDir)
+	session1, err := mgr.Start("agent1", tmpDir)
+	if err != nil {
+		t.Fatalf("Start session1 failed: %v", err)
+	}
+	session2, err := mgr.Start("agent2", tmpDir)
+	if err != nil {
+		t.Fatalf("Start session2 failed: %v", err)
+	}
 
 	sessions, err := mgr.List()
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
-	// Should have at least 2 more sessions than initially
-	if len(sessions) < initialCount+2 {
-		t.Errorf("Expected at least %d sessions, got %d", initialCount+2, len(sessions))
+	if len(sessions) != 2 {
+		t.Errorf("Expected exactly 2 sessions, got %d", len(sessions))
 	}
 
 	// Verify our session IDs are in the list
@@ -204,6 +216,7 @@ func TestListSessions(t *testing.T) {
 }
 
 func TestSessionPersistence(t *testing.T) {
+	setTestHome(t)
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
 
