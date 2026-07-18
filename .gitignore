@@ -60,3 +60,10 @@ roadmap.md
 .vscode/*
 
 .tmp/*
+
+spad/*
+
+# Scratch workspaces used for manual testing / fixtures (not part of the build)
+test-workspaces/
+# Local planning docs (not for release)
+PR.md

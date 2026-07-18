@@ -1,0 +1,64 @@
+{
+  "id": "vectraguard",
+  "name": "VectraGuard",
+  "description": "VectraGuard security integration — command safety, CVE scanning, secret detection, prompt firewall",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "binaryPath": {
+        "type": "string",
+        "description": "Path to vectra-guard binary (empty for auto-detect)"
+      },
+      "guardLevel": {
+        "type": "string",
+        "enum": ["auto", "strict", "permissive"],
+        "description": "Guard level for command risk decisions"
+      },
+      "commandGate": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "blockOnHigh": { "type": "boolean" },
+          "blockOnMedium": { "type": "boolean" },
+          "timeoutMs": { "type": "number" }
+        }
+      },
+      "promptFirewall": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "timeoutMs": { "type": "number" }
+        }
+      },
+      "cveScan": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "autoSyncEnabled": { "type": "boolean" },
+          "syncIntervalMs": { "type": "number" },
+          "timeoutMs": { "type": "number" }
+        }
+      },
+      "secretScan": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "timeoutMs": { "type": "number" }
+        }
+      },
+      "seedAgents": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" }
+        }
+      },
+      "auditTrail": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

@@ -165,7 +165,9 @@ services:
     privileged: true  # Required for Docker-in-Docker
     working_dir: /workspace
     entrypoint: []
-    command: ["go", "test", "-v", "./..."]
+    # test-workspaces/ holds untracked manual fixtures (e.g. aider checkouts) that
+    # are not part of the build; exclude them so go test ./... stays scoped to real source.
+    command: ["/bin/sh", "-c", "go test -v $(go list ./... | grep -v /test-workspaces/)"]
     networks:
       - test-network
 

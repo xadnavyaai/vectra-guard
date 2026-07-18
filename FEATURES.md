@@ -20,8 +20,26 @@ Scans manifests + lockfiles (npm, pip, go, etc.) and flags packages with **known
 📊 **Audit & traceability**  
 Track what ran, who ran it, and why — perfect for agent sessions and compliance.
 
-⚙️ **Agent-friendly**  
+⚙️ **Agent-friendly**
 Works seamlessly with Cursor, VS Code, Replit, Copilot workflows — protects devs and bots alike.
+
+---
+
+## 🆕 Post-Mythos Wave (April 2026)
+
+Shipped this week in response to the Claude Mythos / Project Glasswing threat shift. See the [Mythos-world blog post](docs/blog/vectra-guard-in-a-mythos-world.md) and the [AI agent threat model reference](docs/ai-agent-threat-model.md).
+
+- 🧭 **`vg scan boundaries`** — audit trust boundaries (FFI, `unsafe {}`, cgo, ctypes, N-API, JNI, `dlsym`) across Rust, Go, Python, Node, Java, and C/C++. The Rust VMM guest-escape disclosed on April 7 lived entirely inside `unsafe {}` blocks; this scanner surfaces every place where that audit has to happen.
+- ⏱️ **`vg cve freshness` + `vg cve scan --max-age-days N`** — advisory velocity is now a live concern. Freshness reports cache age and last sync; `--max-age-days N` hard-fails CI (exit 2) if the local OSV cache is older than N days.
+- 🧠 **`vg prompt-firewall` v2 (18 detectors + `--benchmark`)** — expanded regex suite with gap-aware matching, plus entropy, trigram, base64 re-decode, zero-width, leetspeak, and sandwich-attack checks. Ships with a 100-prompt curated benchmark corpus; current baseline precision ~0.94, recall ~0.89, F1 ~0.92. See the [prompt firewall reference](docs/prompt-firewall.md) and the [deep-dive post](docs/blog/prompt-firewall-after-mythos.md).
+- 📈 **`vg behavioral profile`** — deterministic session action graph. Closed 8-category taxonomy (`data_read`, `data_write`, `file_access`, `code_exec`, `external_api`, `network_call`, `auth_action`, `internal_compute`). Diff two runs to ask "does this agent's behavioral shape look like prior runs on similar tasks?" v1 is the primitive; anomaly detection lands in a later release.
+
+```bash
+vg scan boundaries --path .
+vg cve sync --path . && vg cve scan --path . --max-age-days 7
+vg prompt-firewall --benchmark
+vg behavioral profile --session $SESSION --output json
+```
 
 ---
 

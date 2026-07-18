@@ -31,8 +31,12 @@ AI agents and automation run with your full shell access. One mistaken command c
 - External HTTP(S) endpoints when using `vg`/`vectra-guard` (localhost only; override with `VECTRAGUARD_ALLOW_NET=1`)
 - Sudo usage when using `vg`/`vectra-guard` (override with `VECTRAGUARD_ALLOW_SUDO=1`)
 
-> 📖 **[View Complete Feature Guide →](FEATURES.md)** — Detailed examples, workflows, and use cases  
+> 📖 **[View Complete Feature Guide →](FEATURES.md)** — Detailed examples, workflows, and use cases
 > 📖 **[Control panel & deployment security →](docs/control-panel-security.md)** — Checklist, CI examples, scan-security rule reference
+
+### Why now (April 2026)
+
+Anthropic's **Claude Mythos** preview on April 7 showed a frontier model autonomously finding and exploiting high-severity bugs — including a 17-year FreeBSD NFS root, an FFmpeg decoder bug, and a Rust-based VMM guest-escape that lived entirely inside `unsafe {}` blocks. Three trust signals engineers used to rely on ("this code is old and reviewed," "this code is memory-safe," "this code is fuzzed") just got materially weaker. Vectra Guard's prompt firewall, sandbox, CVE freshness checks, FFI boundary scanner, and session behavioral profile are the cheap, deterministic first line of defense that covers the new threat shape. See **[how Vectra Guard fits the agent threat model →](docs/ai-agent-threat-model.md)** for the full stage-by-stage mapping.
 
 ---
 

@@ -1,0 +1,17 @@
+digraph "session-fixture-mythos" {
+  rankdir=TB;
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5", fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=10];
+
+  "data_read" [label="data_read\n(1)"];
+  "data_write" [label="data_write\n(3)"];
+  "file_access" [label="file_access\n(1)"];
+  "code_exec" [label="code_exec\n(1)"];
+  "network_call" [label="network_call\n(1)"];
+
+  "data_read" -> "file_access" [label="1  (avg 1s)"];
+  "data_write" -> "code_exec" [label="1  (avg 2s)"];
+  "data_write" -> "data_write" [label="2  (avg 2s)"];
+  "file_access" -> "network_call" [label="1  (avg 1s)"];
+  "network_call" -> "data_write" [label="1  (avg 1s)"];
+}
