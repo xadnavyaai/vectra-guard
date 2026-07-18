@@ -21,6 +21,7 @@ type Config struct {
 	Sandbox              SandboxConfig              `yaml:"sandbox" toml:"sandbox" json:"sandbox"`
 	CVE                  CVEConfig                  `yaml:"cve" toml:"cve" json:"cve"`
 	SoftDelete           SoftDeleteConfig           `yaml:"soft_delete" toml:"soft_delete" json:"soft_delete"`
+	LLMTrace             LLMTraceConfig             `yaml:"llmtrace" toml:"llmtrace" json:"llmtrace"`
 }
 
 // LoggingConfig controls output formatting.
@@ -180,6 +181,17 @@ type SoftDeleteConfig struct {
 	RotationPolicy      string `yaml:"rotation_policy" toml:"rotation_policy" json:"rotation_policy"` // age, count, size, age_and_count
 }
 
+// LLMTraceConfig controls LLM observability trace integration.
+type LLMTraceConfig struct {
+	Enabled      bool   `yaml:"enabled" toml:"enabled" json:"enabled"`
+	Host         string `yaml:"host" toml:"host" json:"host"`
+	PublicKey    string `yaml:"public_key" toml:"public_key" json:"public_key"`
+	SecretKey    string `yaml:"secret_key" toml:"secret_key" json:"secret_key"`
+	PollInterval int    `yaml:"poll_interval_seconds" toml:"poll_interval_seconds" json:"poll_interval_seconds"`
+	BatchSize    int    `yaml:"batch_size" toml:"batch_size" json:"batch_size"`
+	ScorePrefix  string `yaml:"score_prefix" toml:"score_prefix" json:"score_prefix"`
+}
+
 // BindMountConfig represents a bind mount configuration
 type BindMountConfig struct {
 	HostPath      string `yaml:"host_path" toml:"host_path" json:"host_path"`
@@ -299,6 +311,13 @@ func DefaultConfig() Config {
 			Sources:             []string{"osv"},
 			UpdateIntervalHours: 24,
 			CacheDir:            "",
+		},
+		LLMTrace: LLMTraceConfig{
+			Enabled:      false,
+			Host:         "https://cloud.langfuse.com",
+			PollInterval: 60,
+			BatchSize:    50,
+			ScorePrefix:  "vg_",
 		},
 		SoftDelete: SoftDeleteConfig{
 			Enabled:             true,            // Enabled by default for safety
@@ -523,6 +542,45 @@ func merge(dst *Config, src Config) {
 	if src.CVE.CacheDir != "" {
 		dst.CVE.CacheDir = src.CVE.CacheDir
 	}
+
+	// Merge LLM trace configuration
+	dst.LLMTrace.Enabled = src.LLMTrace.Enabled
+	if src.LLMTrace.Host != "" {
+		dst.LLMTrace.Host = src.LLMTrace.Host
+	}
+	if src.LLMTrace.PublicKey != "" {
+		dst.LLMTrace.PublicKey = src.LLMTrace.PublicKey
+	}
+	if src.LLMTrace.SecretKey != "" {
+		dst.LLMTrace.SecretKey = src.LLMTrace.SecretKey
+	}
+	if src.LLMTrace.PollInterval > 0 {
+		dst.LLMTrace.PollInterval = src.LLMTrace.PollInterval
+	}
+	if src.LLMTrace.BatchSize > 0 {
+		dst.LLMTrace.BatchSize = src.LLMTrace.BatchSize
+	}
+	if src.LLMTrace.ScorePrefix != "" {
+		dst.LLMTrace.ScorePrefix = src.LLMTrace.ScorePrefix
+	}
+
+	// Apply LLM trace environment variable overrides
+	// Supports both LLMTRACE_* and LANGFUSE_* (for Langfuse users)
+	if v := os.Getenv("LLMTRACE_HOST"); v != "" {
+		dst.LLMTrace.Host = v
+	} else if v := os.Getenv("LANGFUSE_HOST"); v != "" {
+		dst.LLMTrace.Host = v
+	}
+	if v := os.Getenv("LLMTRACE_PUBLIC_KEY"); v != "" {
+		dst.LLMTrace.PublicKey = v
+	} else if v := os.Getenv("LANGFUSE_PUBLIC_KEY"); v != "" {
+		dst.LLMTrace.PublicKey = v
+	}
+	if v := os.Getenv("LLMTRACE_SECRET_KEY"); v != "" {
+		dst.LLMTrace.SecretKey = v
+	} else if v := os.Getenv("LANGFUSE_SECRET_KEY"); v != "" {
+		dst.LLMTrace.SecretKey = v
+	}
 }
 
 func exists(path string) bool {
@@ -561,6 +619,9 @@ func decodeYAML(data []byte) (Config, error) {
 				listTarget = nil
 			case "cve":
 				mode = "cve"
+				listTarget = nil
+			case "llmtrace":
+				mode = "llmtrace"
 				listTarget = nil
 			case "allowlist":
 				if mode == "policies" {
@@ -679,6 +740,27 @@ func decodeYAML(data []byte) (Config, error) {
 						cfg.CVE.UpdateIntervalHours = parsed
 					}
 				}
+			case "llmtrace":
+				switch key {
+				case "enabled":
+					cfg.LLMTrace.Enabled = value == "true"
+				case "host":
+					cfg.LLMTrace.Host = value
+				case "public_key":
+					cfg.LLMTrace.PublicKey = value
+				case "secret_key":
+					cfg.LLMTrace.SecretKey = value
+				case "poll_interval_seconds":
+					if parsed, err := strconv.Atoi(value); err == nil {
+						cfg.LLMTrace.PollInterval = parsed
+					}
+				case "batch_size":
+					if parsed, err := strconv.Atoi(value); err == nil {
+						cfg.LLMTrace.BatchSize = parsed
+					}
+				case "score_prefix":
+					cfg.LLMTrace.ScorePrefix = value
+				}
 			}
 		}
 	}
@@ -732,6 +814,27 @@ func decodeTOML(data []byte) (Config, error) {
 				}
 			case "sources":
 				cfg.CVE.Sources = parseStringArray(value)
+			}
+		case "llmtrace":
+			switch key {
+			case "enabled":
+				cfg.LLMTrace.Enabled = trimQuotes(value) == "true"
+			case "host":
+				cfg.LLMTrace.Host = trimQuotes(value)
+			case "public_key":
+				cfg.LLMTrace.PublicKey = trimQuotes(value)
+			case "secret_key":
+				cfg.LLMTrace.SecretKey = trimQuotes(value)
+			case "poll_interval_seconds":
+				if parsed, err := strconv.Atoi(trimQuotes(value)); err == nil {
+					cfg.LLMTrace.PollInterval = parsed
+				}
+			case "batch_size":
+				if parsed, err := strconv.Atoi(trimQuotes(value)); err == nil {
+					cfg.LLMTrace.BatchSize = parsed
+				}
+			case "score_prefix":
+				cfg.LLMTrace.ScorePrefix = trimQuotes(value)
 			}
 		}
 	}
