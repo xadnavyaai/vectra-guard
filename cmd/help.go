@@ -23,6 +23,7 @@ Topics:
   seed      Seed agent instructions into a repo
   audit     Audit npm/pip packages for vulnerabilities
   cve       Scan manifests using local CVE cache
+  llmtrace  LLM trace security analysis
 `)
 	case "context":
 		return printHelp(`Context summaries:
@@ -125,6 +126,43 @@ auto-installed; use --no-install to disable.
 
 Sync fetches CVE data into a local cache. Scan analyzes manifests/lockfiles and
 reports known vulnerabilities. Explain shows cached advisories for a package.
+`)
+	case "llmtrace":
+		return printHelp(`LLM trace security analysis:
+
+  vg llmtrace connect [--host URL] [--public-key KEY] [--secret-key KEY]
+  vg llmtrace sync [--from TIMESTAMP] [--dry-run]
+  vg llmtrace scan --trace <id> [--write-scores]
+  vg llmtrace watch
+
+Connect to an LLM observability provider (e.g. Langfuse), pull traces, and
+run security analysis:
+  - Prompt injection detection (via prompt-firewall engine)
+  - Cost anomaly detection (statistical baseline)
+  - Suspicious tool call flagging
+  - Agent loop detection (repetitive behavior)
+  - Data exfiltration pattern matching
+
+Scores written back to provider:
+  vg_injection_risk   Prompt injection risk (0.0-1.0)
+  vg_cost_anomaly     Cost deviation from baseline
+  vg_tool_anomaly     Suspicious tool usage
+  vg_agent_loop       Repetitive agent behavior
+  vg_data_exfil       Data exfiltration patterns
+
+Configuration (config.yaml):
+  llmtrace:
+    enabled: true
+    host: https://cloud.langfuse.com   # or any compatible provider
+    public_key: pk-lf-...
+    secret_key: sk-lf-...
+    poll_interval_seconds: 60
+    batch_size: 50
+    score_prefix: vg_
+
+Environment variables:
+  LLMTRACE_HOST, LLMTRACE_PUBLIC_KEY, LLMTRACE_SECRET_KEY
+  LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY (compat)
 `)
 	default:
 		return printHelp(fmt.Sprintf("Unknown help topic: %s\n", topic))

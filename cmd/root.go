@@ -68,6 +68,24 @@ func execute(args []string) error {
 			return err
 		}
 		return runScanSecrets(ctx, *target, *allowlist)
+	case "scan":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		scanCmd := subArgs[0]
+		scanArgs := subArgs[1:]
+		switch scanCmd {
+		case "boundaries":
+			subFlags := flag.NewFlagSet("scan-boundaries", flag.ContinueOnError)
+			target := subFlags.String("path", ".", "Target directory or file to scan for trust boundaries")
+			languages := subFlags.String("languages", "", "Comma-separated languages to scan (rust,go,python,node,java,c)")
+			if err := subFlags.Parse(scanArgs); err != nil {
+				return err
+			}
+			return runScanBoundaries(ctx, *target, *languages)
+		default:
+			return usageError()
+		}
 	case "scan-security":
 		subFlags := flag.NewFlagSet("scan-security", flag.ContinueOnError)
 		target := subFlags.String("path", ".", "Target directory or file to scan for security issues")
@@ -113,10 +131,11 @@ func execute(args []string) error {
 	case "prompt-firewall":
 		subFlags := flag.NewFlagSet("prompt-firewall", flag.ContinueOnError)
 		file := subFlags.String("file", "", "Read prompt text from file instead of stdin")
+		benchmark := subFlags.Bool("benchmark", false, "Run detectors against the bundled corpus and print precision/recall")
 		if err := subFlags.Parse(subArgs); err != nil {
 			return err
 		}
-		return runPromptFirewall(ctx, *file)
+		return runPromptFirewall(ctx, *file, *benchmark)
 	case "explain":
 		subFlags := flag.NewFlagSet("explain", flag.ContinueOnError)
 		if err := subFlags.Parse(subArgs); err != nil {
@@ -156,10 +175,18 @@ func execute(args []string) error {
 			subFlags := flag.NewFlagSet("cve-scan", flag.ContinueOnError)
 			target := subFlags.String("path", ".", "Target directory for manifests")
 			refresh := subFlags.Bool("refresh", false, "Refresh cached entries before scanning")
+			maxAgeDays := subFlags.Int("max-age-days", 0, "Hard-fail if the local CVE cache is older than this many days (0=disabled)")
 			if err := subFlags.Parse(cveArgs); err != nil {
 				return err
 			}
-			return runCVEScan(ctx, *target, *refresh)
+			return runCVEScan(ctx, *target, *refresh, *maxAgeDays)
+		case "freshness":
+			subFlags := flag.NewFlagSet("cve-freshness", flag.ContinueOnError)
+			jsonOut := subFlags.Bool("json", false, "Output freshness report as JSON")
+			if err := subFlags.Parse(cveArgs); err != nil {
+				return err
+			}
+			return runCVEFreshness(ctx, *jsonOut)
 		case "explain":
 			subFlags := flag.NewFlagSet("cve-explain", flag.ContinueOnError)
 			ecosystem := subFlags.String("ecosystem", "npm", "Package ecosystem (npm, Go, etc.)")
@@ -214,11 +241,16 @@ func execute(args []string) error {
 			return err
 		}
 		var repoOpts *repoAuditOptions
-		if strings.ToLower(auditTool) == "repo" {
+		switch strings.ToLower(auditTool) {
+		case "repo":
 			repoOpts = &repoAuditOptions{
 				OutputFormat:  *outputFormat,
 				AllowlistPath: *allowlistPath,
 				IgnoreGlobs:   *ignoreGlobs,
+			}
+		case "agent-posture":
+			repoOpts = &repoAuditOptions{
+				OutputFormat: *outputFormat,
 			}
 		}
 		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall, *sessionID, *allSessions, repoOpts)
@@ -291,6 +323,25 @@ func execute(args []string) error {
 				return err
 			}
 			return runSessionRecord(ctx, *sessionID, *command, *exitCode)
+		default:
+			return usageError()
+		}
+	case "behavioral":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		behavioralCmd := subArgs[0]
+		behavioralArgs := subArgs[1:]
+		switch behavioralCmd {
+		case "profile":
+			subFlags := flag.NewFlagSet("behavioral-profile", flag.ContinueOnError)
+			sessionID := subFlags.String("session", "", "Session ID to profile")
+			outputFormat := subFlags.String("output", "text", "Output format: text, json, or dot")
+			diffSession := subFlags.String("diff", "", "Compare against another session ID (prints the structural diff)")
+			if err := subFlags.Parse(behavioralArgs); err != nil {
+				return err
+			}
+			return runBehavioralProfile(ctx, *sessionID, *outputFormat, *diffSession)
 		default:
 			return usageError()
 		}
@@ -459,6 +510,46 @@ func execute(args []string) error {
 		default:
 			return usageError()
 		}
+	case "llmtrace":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		llmtraceCmd := subArgs[0]
+		llmtraceArgs := subArgs[1:]
+		switch llmtraceCmd {
+		case "connect":
+			subFlags := flag.NewFlagSet("llmtrace-connect", flag.ContinueOnError)
+			host := subFlags.String("host", "", "LLM trace provider host URL")
+			publicKey := subFlags.String("public-key", "", "LLM trace provider public key")
+			secretKey := subFlags.String("secret-key", "", "LLM trace provider secret key")
+			if err := subFlags.Parse(llmtraceArgs); err != nil {
+				return err
+			}
+			return runLLMTraceConnect(ctx, *host, *publicKey, *secretKey)
+		case "sync":
+			subFlags := flag.NewFlagSet("llmtrace-sync", flag.ContinueOnError)
+			from := subFlags.String("from", "", "Start timestamp (RFC3339)")
+			dryRun := subFlags.Bool("dry-run", false, "Analyze without writing scores")
+			if err := subFlags.Parse(llmtraceArgs); err != nil {
+				return err
+			}
+			return runLLMTraceSync(ctx, *from, *dryRun)
+		case "scan":
+			subFlags := flag.NewFlagSet("llmtrace-scan", flag.ContinueOnError)
+			traceID := subFlags.String("trace", "", "Trace ID to scan")
+			writeScores := subFlags.Bool("write-scores", false, "Write security scores back to provider")
+			if err := subFlags.Parse(llmtraceArgs); err != nil {
+				return err
+			}
+			if *traceID == "" {
+				return fmt.Errorf("--trace is required for llmtrace scan")
+			}
+			return runLLMTraceScan(ctx, *traceID, *writeScores)
+		case "watch":
+			return runLLMTraceWatch(ctx)
+		default:
+			return usageError()
+		}
 	case "version":
 		return runVersion(ctx, *outputFormat)
 	default:
@@ -483,6 +574,11 @@ func usageError() error {
 Commands:
   scan-secrets                 Scan files for exposed secrets (regex + entropy)
   scan-security                Scan source code (Go/Python/C) for risky patterns
+  scan boundaries              Scan repo for FFI / unsafe trust boundaries
+  cve sync                     Sync the local CVE cache from configured sources
+  cve scan [--max-age-days N]  Scan manifests; fail if cache older than N days
+  cve freshness                Print CVE cache age and source list
+  cve explain <pkg>[@ver]      Show advisories for a package
   init                         Initialize configuration file
   validate <script>            Validate a shell script for security issues
   validate-agent <path>        Validate agent scripts (file or directory)
@@ -491,12 +587,14 @@ Commands:
   explain <script>             Explain security risks in a script
   exec [--interactive] <cmd>   Execute command with security validation
   audit <npm|python>           Audit package vulnerabilities (npm/pip-audit)
+  audit agent-posture          Audit AI agent security posture (OAuth, behavioral, hygiene)
   sandbox deps install         Install sandbox dependencies (Docker/Podman + bubblewrap)
   session start                Start an agent session
   session end <id>             End an agent session
   session list                 List all sessions
   session show <id>            Show session details
   session-diff <id>            Show added/modified/deleted files for a session
+  behavioral profile --session <id>  Build a session action graph (category DAG)
   serve [--port]               Serve local dashboard on http://127.0.0.1:PORT
   trust list                   List trusted commands
   trust add <cmd>              Add command to trust store
@@ -511,6 +609,10 @@ Commands:
   roadmap log <id>             Append a log entry to a roadmap item
   context summarize <mode> <path>  Summarize file or repo (code, docs, advanced)
   seed agents                  Seed agent instructions into a repo
+  llmtrace connect             Configure and test LLM trace provider connection
+  llmtrace sync                Pull traces, analyze, write security scores
+  llmtrace scan --trace <id>   Deep-scan a specific trace
+  llmtrace watch               Continuously poll and analyze new traces
   help [topic]                 Show help for a command or topic
   version                      Show version information
 `, name)

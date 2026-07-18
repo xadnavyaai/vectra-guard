@@ -147,6 +147,12 @@ func runAudit(ctx context.Context, tool string, targetPath string, failOnFinding
 		if failOnFindings && summary.Total > 0 {
 			return &exitError{message: "python audit found vulnerabilities", code: 2}
 		}
+	case "agent-posture":
+		outputFormat := "text"
+		if repoOpts != nil && repoOpts.OutputFormat != "" {
+			outputFormat = strings.ToLower(strings.TrimSpace(repoOpts.OutputFormat))
+		}
+		return runAgentPostureAudit(ctx, targetPath, outputFormat, failOnFindings)
 	default:
 		return fmt.Errorf("unsupported audit tool: %s", tool)
 	}

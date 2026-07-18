@@ -103,6 +103,14 @@ func encodeTOML(cfg config.Config) (string, error) {
 	builder.WriteString(fmt.Sprintf("block_env_access = %t  # Block printenv, env commands\n", cfg.EnvProtection.BlockEnvAccess))
 	builder.WriteString(fmt.Sprintf("block_dotenv_read = %t  # Block reading .env files\n", cfg.EnvProtection.BlockDotenvRead))
 	builder.WriteString(formatArray("allow_read_vars", cfg.EnvProtection.AllowReadVars))
+	builder.WriteString("\n[llmtrace]\n")
+	builder.WriteString(fmt.Sprintf("enabled = %t\n", cfg.LLMTrace.Enabled))
+	builder.WriteString(fmt.Sprintf("host = \"%s\"\n", cfg.LLMTrace.Host))
+	builder.WriteString("# public_key = \"pk-lf-...\"\n")
+	builder.WriteString("# secret_key = \"sk-lf-...\"\n")
+	builder.WriteString(fmt.Sprintf("poll_interval_seconds = %d\n", cfg.LLMTrace.PollInterval))
+	builder.WriteString(fmt.Sprintf("batch_size = %d\n", cfg.LLMTrace.BatchSize))
+	builder.WriteString(fmt.Sprintf("score_prefix = \"%s\"\n", cfg.LLMTrace.ScorePrefix))
 	return builder.String(), nil
 }
 
@@ -139,6 +147,14 @@ func encodeYAML(cfg config.Config) (string, error) {
 	for _, item := range cfg.EnvProtection.AllowReadVars {
 		builder.WriteString(fmt.Sprintf("    - %s\n", item))
 	}
+	builder.WriteString("llmtrace:\n")
+	builder.WriteString(fmt.Sprintf("  enabled: %t\n", cfg.LLMTrace.Enabled))
+	builder.WriteString(fmt.Sprintf("  host: %s\n", cfg.LLMTrace.Host))
+	builder.WriteString("  # public_key: pk-lf-...\n")
+	builder.WriteString("  # secret_key: sk-lf-...\n")
+	builder.WriteString(fmt.Sprintf("  poll_interval_seconds: %d\n", cfg.LLMTrace.PollInterval))
+	builder.WriteString(fmt.Sprintf("  batch_size: %d\n", cfg.LLMTrace.BatchSize))
+	builder.WriteString(fmt.Sprintf("  score_prefix: %s\n", cfg.LLMTrace.ScorePrefix))
 	return builder.String(), nil
 }
 

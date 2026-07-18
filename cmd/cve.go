@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,7 +75,7 @@ func runCVESync(ctx context.Context, target string, force bool) error {
 	return nil
 }
 
-func runCVEScan(ctx context.Context, target string, refresh bool) error {
+func runCVEScan(ctx context.Context, target string, refresh bool, maxAgeDays int) error {
 	cfg := config.FromContext(ctx)
 	if !cfg.CVE.Enabled {
 		return fmt.Errorf("cve awareness disabled (set cve.enabled=true)")
@@ -87,6 +88,26 @@ func runCVEScan(ctx context.Context, target string, refresh bool) error {
 	store, err := cve.LoadStore(cachePath)
 	if err != nil {
 		return err
+	}
+
+	// Post-Mythos defaults: if --max-age-days is set, hard-fail before we
+	// trust the cache. Cache age beyond N days is a live exposure.
+	if maxAgeDays > 0 {
+		report := cve.Freshness(store, cfg.CVE.Sources)
+		threshold := time.Duration(maxAgeDays) * 24 * time.Hour
+		if report.IsStale(threshold) {
+			if report.CacheMissing {
+				return &exitError{
+					message: fmt.Sprintf("cve cache missing at %s — run `vg cve sync`", cachePath),
+					code:    2,
+				}
+			}
+			return &exitError{
+				message: fmt.Sprintf("cve cache is stale (age %s > %s) — run `vg cve sync`",
+					report.Age.Round(time.Second), threshold),
+				code: 2,
+			}
+		}
 	}
 
 	packages, warnings, err := cve.DiscoverPackages(target)
@@ -198,6 +219,36 @@ func runCVEExplain(ctx context.Context, pkgArg string, ecosystem string, refresh
 		return entries[i].Package.Version < entries[j].Package.Version
 	})
 	printCVEReport(entries)
+	return nil
+}
+
+func runCVEFreshness(ctx context.Context, outputJSON bool) error {
+	cfg := config.FromContext(ctx)
+	if !cfg.CVE.Enabled {
+		return fmt.Errorf("cve awareness disabled (set cve.enabled=true)")
+	}
+
+	cachePath, err := resolveCVECachePath(cfg.CVE)
+	if err != nil {
+		return err
+	}
+	store, err := cve.LoadStore(cachePath)
+	if err != nil {
+		return err
+	}
+
+	report := cve.Freshness(store, cfg.CVE.Sources)
+
+	if outputJSON {
+		data, err := json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	fmt.Print(report.String())
 	return nil
 }
 

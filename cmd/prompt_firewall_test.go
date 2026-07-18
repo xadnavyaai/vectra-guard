@@ -24,7 +24,7 @@ func TestRunPromptFirewallHighRiskFromFile(t *testing.T) {
 	ctx = config.WithConfig(ctx, config.DefaultConfig())
 	ctx = logging.WithLogger(ctx, logging.NewLogger("text", &buf))
 
-	err := runPromptFirewall(ctx, path)
+	err := runPromptFirewall(ctx, path, false)
 	if err == nil {
 		t.Fatalf("expected high-risk prompt to be blocked with exit error")
 	}
@@ -46,7 +46,7 @@ func TestRunPromptFirewallLowRiskFromFile(t *testing.T) {
 	ctx = config.WithConfig(ctx, config.DefaultConfig())
 	ctx = logging.WithLogger(ctx, logging.NewLogger("text", &buf))
 
-	if err := runPromptFirewall(ctx, path); err != nil {
+	if err := runPromptFirewall(ctx, path, false); err != nil {
 		t.Fatalf("expected low-risk prompt to be allowed, got %v", err)
 	}
 }
