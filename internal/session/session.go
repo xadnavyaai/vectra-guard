@@ -1,6 +1,8 @@
 package session
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -216,7 +218,17 @@ func (m *Manager) save(session *Session) error {
 
 // generateSessionID creates a unique session identifier.
 func generateSessionID() string {
-	return fmt.Sprintf("session-%d", time.Now().UnixNano())
+	// A timestamp alone is not collision-safe: on platforms with a
+	// low-resolution wall clock (notably Windows) two sessions started in
+	// quick succession can share the same UnixNano value, producing
+	// duplicate IDs that clobber each other's session file. Append random
+	// bytes so IDs stay unique regardless of clock granularity.
+	var b [6]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// crypto/rand should never fail; fall back to the raw timestamp.
+		return fmt.Sprintf("session-%d", time.Now().UnixNano())
+	}
+	return fmt.Sprintf("session-%d-%s", time.Now().UnixNano(), hex.EncodeToString(b[:]))
 }
 
 // GetCurrentSession returns the active session ID from environment.
